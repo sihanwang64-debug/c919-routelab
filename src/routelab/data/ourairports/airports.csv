@@ -1,0 +1,12 @@
+ident,type,name,latitude_deg,longitude_deg,elevation_ft,continent,iso_country,iso_region,municipality,scheduled_service,iata_code
+ZSPD,large_airport,Shanghai Pudong International Airport,31.1443,121.8083,13,AS,CN,CN-SH,Shanghai,yes,PVG
+ZBAA,large_airport,Beijing Capital International Airport,40.0801,116.5846,116,AS,CN,CN-BJ,Beijing,yes,PEK
+ZGGG,large_airport,Guangzhou Baiyun International Airport,23.3924,113.2988,52,AS,CN,CN-GD,Guangzhou,yes,CAN
+ZUUU,large_airport,Chengdu Shuangliu International Airport,30.5785,103.9471,1624,AS,CN,CN-SC,Chengdu,yes,CTU
+ZLXY,large_airport,Xi'an Xianyang International Airport,34.4471,108.7516,1572,AS,CN,CN-SN,Xi'an,yes,XIY
+ZWWW,large_airport,Urumqi Diwopu International Airport,43.9007,87.4739,2126,AS,CN,CN-XJ,Urumqi,yes,URC
+ZWSH,large_airport,Kashgar Airport,39.5430,76.0206,4420,AS,CN,CN-XJ,Kashgar,yes,KHG
+ZPPP,large_airport,Kunming Changshui International Airport,25.1019,102.9292,6903,AS,CN,CN-YN,Kunming,yes,KMG
+LFPG,large_airport,Paris Charles de Gaulle Airport,49.0097,2.5479,392,EU,FR,FR-IDF,Paris,yes,CDG
+EGLL,large_airport,London Heathrow Airport,51.4700,-0.4543,83,EU,GB,GB-ENG,London,yes,LHR
+KJFK,large_airport,John F. Kennedy International Airport,40.6398,-73.7789,13,NA,US,US-NY,New York,yes,JFK

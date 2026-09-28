@@ -1,0 +1,10 @@
+site_name: c919-routelab
+site_description: Learning-grade narrow-body route operations analysis on public data.
+theme:
+  name: material
+  features:
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Methodology: methodology.md
+  - Data sources: data-sources.md
