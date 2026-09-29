@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>c919-routelab ✈️ 航线运行分析台</title>
-<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
-<script>window.Plotly || document.write('<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"><\/script>');</script>
+<script src="vendor/plotly.min.js"></script>
+<script>window.Plotly || document.write('<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"><\/script>');</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
   <p>基于公开数据的学习级工具（非官方，不可用于飞行计划/工程）—— A320neo 级代理机型近似 C919。
      计算全部在后端 <code>routelab</code> Python 包完成，本页只做展示与交互（API 文档：<a href="/docs" target="_blank">/docs</a>）。</p>
 </header>
-<div id="plot-error">图表库（Plotly）加载失败——本页需联网加载图表库，请检查网络后刷新。</div>
+<div id="plot-error">图表库（Plotly）加载失败——本地副本 vendor/plotly.min.js 与 CDN 均不可用，请刷新重试。</div>
 <div class="wrap">
   <aside>
     <div class="group">机型参数（A320neo 级代理，可调）
