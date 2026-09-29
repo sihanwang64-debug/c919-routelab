@@ -53,8 +53,8 @@ routelab airports --country CN
 
 | 案例 | 问题 | 状态 |
 |---|---|---|
-| 01 业载-航程 | 代理机型的业载-航程包线长什么样？ | 🚧 进行中 |
-| 02 高原高温 | 浦东—乌鲁木齐/喀什：高温高原机场的起降与备降 | 🚧 进行中 |
+| [01 业载-航程](cases/01_range_payload.ipynb) | C919（估计参数）vs A320neo vs 737 MAX 8 的业载-航程包线，谁被油箱卡住？OEW 敏感性多大？ | ✅ 已完成 |
+| [02 高原高温](cases/02_hot_high.ipynb) | 浦东—乌鲁木齐/喀什：高温高原机场的起降场长余量与备降油量 | ✅ 已完成 |
 | 03 延误传播 | 实测航班数据里，延误如何沿机尾号链传播？ | 📋 规划中 |
 | 04 机队情景 | 2026–2030 假想航线网络覆盖与座位投放 | 📋 规划中 |
 
@@ -68,9 +68,10 @@ routelab airports --country CN
 ## 路线图
 
 - [x] v0.1 仓库骨架：CLI + 大圆 + 机场数据 + 性能/油量内核 + CI
-- [ ] v0.2 OpenAP 封装、业载-航程案例 notebook
-- [ ] v0.3 高温高原案例 + OpenSky 延误传播分析
-- [ ] v1.0 机队情景案例 + 文档站（GitHub Pages）
+- [x] v0.2 业载-航程案例 notebook + 高原高温案例 notebook + 文档站上线（GitHub Pages）
+- [ ] OpenAP 研究级性能后端封装（可选 extra，规划中）
+- [ ] v0.3 OpenSky 延误传播网络分析（`network.py` + 案例 03）
+- [ ] v1.0 机队情景案例 + 打 tag
 
 ## English
 
