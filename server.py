@@ -16,6 +16,7 @@ Interactive API docs: http://127.0.0.1:8300/docs
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
 from typing import Literal
@@ -36,13 +37,27 @@ from routelab.performance import (
 from routelab.planning import plan_leg
 from routelab.presets import PRESET_AIRCRAFT
 
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # prebuild the OpenAP grid integrator so the first user request is fast
+    try:
+        from routelab.openap_backend import _integrator
+
+        _integrator("a320")
+    except Exception:
+        pass  # openap not installed: the simple backend serves everything
+    yield
+
+
 app = FastAPI(
     title="c919-routelab API",
     description=(
         "Learning-grade narrow-body route operations analysis "
         "(public data only, unofficial -- not for flight planning)."
     ),
-    version="0.1.0",
+    version="1.0.0",
+    lifespan=_lifespan,
 )
 _DB = AirportDB()
 

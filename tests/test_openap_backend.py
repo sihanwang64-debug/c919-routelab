@@ -87,3 +87,50 @@ def test_plan_leg_unknown_backend_rejected() -> None:
     db = AirportDB()
     with pytest.raises(ValueError, match="unknown backend"):
         plan_leg(db, ProxyAircraft(), "ZSPD", "ZWWW", backend="magic")
+
+
+def test_integrator_matches_stepwise_euler_reference() -> None:
+    # fine-step Euler reference (30 s) vs the cached grid integral: the two
+    # must agree within 1 % on both range and trip fuel
+
+    openap = ob._openap()
+    ff = ob._fuelflow("a320")
+    tas = float(openap.aero.mach2tas(0.78, 35000 * 0.3048))  # m/s
+
+    m0, fuel_budget = 71_600.0, 12_000.0
+    mass, fuel_left, dist_m = m0, fuel_budget, 0.0
+    while fuel_left > 0:
+        flow = float(ff.enroute(mass=mass, tas=tas, alt=35000 * 0.3048))
+        step = min(30.0 * flow, fuel_left)
+        mass -= step
+        fuel_left -= step
+        dist_m += tas * 30.0
+    reference_km = dist_m / 1000.0
+
+    modelled_km = float(ob.integrate_cruise("a320", m0, fuel_budget).distance_km)
+    assert modelled_km == pytest.approx(reference_km, rel=0.01)
+
+    # inverse problem: fuel for a given distance matches the same reference
+    fuel_back = ob.trip_fuel_openap("a320", m0, reference_km)
+    assert fuel_back == pytest.approx(fuel_budget, rel=0.01)
+
+
+def test_fueflow_and_integrator_instances_are_cached() -> None:
+    ob.payload_range_table_openap(
+        "a320", max_payload_kg=18_500, tank_capacity_kg=19_000, step_kg=2_000
+    )
+    n_ff = len(ob._FUELFLOW_CACHE)
+    n_int = len(ob._INTEGRATOR_CACHE)
+    ob.payload_range_table_openap(
+        "a320", max_payload_kg=18_500, tank_capacity_kg=19_000, step_kg=2_000
+    )
+    ob.trip_fuel_openap("a320", 71_600, 3_312)
+    assert len(ob._FUELFLOW_CACHE) == n_ff      # no re-construction
+    assert len(ob._INTEGRATOR_CACHE) == n_int   # grid integral reused
+
+
+def test_headwind_reduces_range_but_not_burn_time() -> None:
+    calm = ob.integrate_cruise("a320", 71_600, 10_000)
+    windy = ob.integrate_cruise("a320", 71_600, 10_000, headwind_kmh=90)
+    assert windy.distance_km < calm.distance_km
+    assert windy.time_h == pytest.approx(calm.time_h, rel=0.02)  # same air time

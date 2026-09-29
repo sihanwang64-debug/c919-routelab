@@ -244,7 +244,7 @@ async function renderEnv() {
           t, i,
           env: await api("/api/envelope", {
             aircraft: aircraftPayload(), reserve_kg: reserve,
-            backend: "openap", actype: t, step_kg: 500,
+            backend: "openap", actype: t, step_kg: 250,
           }),
         }))
       );
