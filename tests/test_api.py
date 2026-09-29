@@ -15,6 +15,17 @@ from server import app  # noqa: E402
 
 client = TestClient(app)
 
+try:
+    import openap  # noqa: F401
+
+    HAVE_OPENAP = True
+except ImportError:  # Python 3.10 CI leg installs no openap
+    HAVE_OPENAP = False
+
+openap_required = pytest.mark.skipif(
+    not HAVE_OPENAP, reason="openap not installed (needs Python 3.11+)"
+)
+
 
 def test_airports_endpoint_lists_bundled_sample() -> None:
     res = client.get("/api/airports")
@@ -82,12 +93,14 @@ def test_frontend_index_served() -> None:
     assert "航线运行分析台" in res.text
 
 
+@openap_required
 def test_aircraft_types_endpoint() -> None:
     res = client.get("/api/aircraft-types")
     assert res.status_code == 200
     assert "a320" in res.json()
 
 
+@openap_required
 def test_route_endpoint_openap_backend() -> None:
     res = client.post("/api/route", json={
         "origin": "ZSPD", "destination": "ZWWW", "alternate": "ZWSH",
@@ -102,6 +115,7 @@ def test_route_endpoint_openap_backend() -> None:
     assert body["feasible"] is plan.feasible
 
 
+@openap_required
 def test_route_endpoint_openap_unknown_actype_is_404() -> None:
     res = client.post("/api/route", json={
         "origin": "ZSPD", "destination": "ZWWW",
@@ -110,6 +124,7 @@ def test_route_endpoint_openap_unknown_actype_is_404() -> None:
     assert res.status_code == 404
 
 
+@openap_required
 def test_route_endpoint_openap_requires_actype() -> None:
     res = client.post("/api/route", json={
         "origin": "ZSPD", "destination": "ZWWW", "backend": "openap",
@@ -124,6 +139,7 @@ def test_route_endpoint_rejects_unknown_backend() -> None:
     assert res.status_code == 422  # pydantic Literal validation
 
 
+@openap_required
 def test_envelope_endpoint_openap_backend() -> None:
     res = client.post("/api/envelope", json={
         "reserve_kg": 2_500, "backend": "openap", "actype": "a320",
