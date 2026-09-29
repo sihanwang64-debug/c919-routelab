@@ -68,7 +68,8 @@ routelab airports --country CN
 ## 路线图
 
 - [x] v0.1 仓库骨架：CLI + 大圆 + 机场数据 + 性能/油量内核 + CI
-- [x] v0.2 业载-航程案例 notebook + 高原高温案例 notebook + 文档站上线（GitHub Pages）
+- [x] v0.2 业载-航程案例 notebook + 高原高温案例 notebook
+- [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
 - [ ] OpenAP 研究级性能后端封装（可选 extra，规划中）
 - [ ] v0.3 OpenSky 延误传播网络分析（`network.py` + 案例 03）
 - [ ] v1.0 机队情景案例 + 打 tag
