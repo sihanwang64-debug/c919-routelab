@@ -75,20 +75,29 @@ def max_range_km(
     return max(0.0, cruise_hours - ac.climb_descent_extra_h) * ground_speed
 
 
-def payload_range_table(ac: ProxyAircraft, step_kg: float = 500.0) -> pd.DataFrame:
+def payload_range_table(
+    ac: ProxyAircraft, step_kg: float = 500.0, reserve_kg: float = 0.0
+) -> pd.DataFrame:
     """Payload-range envelope from max structural payload down to zero.
 
     The resulting curve has the classic shape: an MTOW-limited rising segment
-    at high payload, then a flat segment at full tank capacity.
+    at high payload, then a flat segment at full tank capacity. ``reserve_kg``
+    subtracts a fixed reserve allowance from the usable fuel before computing
+    range -- brochure-style "range" figures typically include such reserves.
     """
+    if reserve_kg < 0:
+        raise ValueError("reserve_kg must be non-negative")
     rows = []
     payload = ac.max_payload_kg
     while payload >= 0:
+        usable = max(0.0, usable_fuel_at_payload(ac, payload) - reserve_kg)
+        cruise_hours = usable / ac.cruise_fuel_kg_per_h
         rows.append(
             {
                 "payload_kg": payload,
                 "usable_fuel_kg": usable_fuel_at_payload(ac, payload),
-                "max_range_km": max_range_km(ac, payload),
+                "max_range_km": max(0.0, cruise_hours - ac.climb_descent_extra_h)
+                * ac.cruise_tas_kmh,
             }
         )
         payload -= step_kg
@@ -116,6 +125,13 @@ _TOFL_BASE_M = 2_000.0  # sea-level ISA takeoff field length at MTOW, no wind
 _TOFL_PER_1000FT = 0.07  # +7 % per 1000 ft pressure altitude
 _TOFL_PER_ISA_DEV_C = 0.006  # +0.6 % per degC above ISA
 _TOFL_HEADWIND_FACTOR_PER_MPS = 0.01  # -1 % per m/s headwind
+
+_ISA_LAPSE_C_PER_1000FT = 1.9812  # standard troposphere lapse rate
+
+
+def isa_temperature_c(elevation_ft: float) -> float:
+    """ISA temperature at a pressure altitude (troposphere lapse rate)."""
+    return 15.0 - _ISA_LAPSE_C_PER_1000FT * elevation_ft / 1000.0
 
 
 def takeoff_field_length_m(

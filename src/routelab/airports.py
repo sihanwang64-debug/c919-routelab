@@ -98,6 +98,10 @@ class AirportDB:
         """All bundled airports for one ISO country code, e.g. 'CN'."""
         return [a for a in self._airports if a.iso_country == iso_country.upper()]
 
+    def all(self) -> list[Airport]:
+        """All bundled airports."""
+        return list(self._airports)
+
     def max_runway_m(self, airport: Airport) -> float | None:
         """Longest runway at the airport, in metres; None when unknown."""
         if self._runways is None:

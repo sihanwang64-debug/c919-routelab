@@ -47,6 +47,21 @@ routelab range ZSPD ZWWW --alternate ZWSH --payload 15000
 routelab airports --country CN
 ```
 
+## Web 界面（Streamlit）
+
+```bash
+pip install -e ".[app]"
+streamlit run app.py
+```
+
+浏览器打开 http://localhost:8501，三个标签页：
+
+- **🛫 航线规划**：选出发/到达/备降机场，世界地图上看大圆航线，实时输出轮档油构成、可带业载与可行性判定；
+- **📊 业载-航程**：拖动储备油扣减、机型对比（A320neo / 737 MAX 8 / C919 估计值 / 自定义机型），交互式包线图；
+- **🌡️ 高原高温**：选机场、改温度，看启发式起飞场长 vs 可用跑道的余量与临界温度。
+
+侧栏可调机型参数（MTOW/OEW/油量/业载/油耗/速度）与油量政策（绕飞比例、最终储备、滑行油）。
+
 （可选）研究级性能模型：`pip install -e ".[perf]"` 安装 OpenAP 后端（规划中，见路线图）。
 
 ## 案例集（cases/）

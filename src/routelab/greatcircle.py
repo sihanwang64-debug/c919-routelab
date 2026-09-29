@@ -66,3 +66,41 @@ def route_between(
         distance_km=haversine_distance_km(lat1, lon1, lat2, lon2),
         bearing_deg=initial_bearing_deg(lat1, lon1, lat2, lon2),
     )
+
+
+def intermediate_points(
+    lat1: float, lon1: float, lat2: float, lon2: float, n: int = 64
+) -> list[tuple[float, float]]:
+    """Sample ``n`` (lat, lon) points along the great-circle path, endpoints included.
+
+    Uses spherical linear interpolation between the two unit vectors, so the
+    sampled path length matches the haversine distance to within discretisation
+    error. Intended for drawing route arcs on maps.
+    """
+    if n < 2:
+        raise ValueError("n must be at least 2")
+    phi1, lmb1 = math.radians(lat1), math.radians(lon1)
+    phi2, lmb2 = math.radians(lat2), math.radians(lon2)
+    v1 = (
+        math.cos(phi1) * math.cos(lmb1),
+        math.cos(phi1) * math.sin(lmb1),
+        math.sin(phi1),
+    )
+    v2 = (
+        math.cos(phi2) * math.cos(lmb2),
+        math.cos(phi2) * math.sin(lmb2),
+        math.sin(phi2),
+    )
+    dot = max(-1.0, min(1.0, sum(a * b for a, b in zip(v1, v2))))
+    omega = math.acos(dot)
+    if omega < 1e-9:  # same point: no arc to interpolate
+        return [(lat1, lon1)] * n
+    sin_omega = math.sin(omega)
+    points: list[tuple[float, float]] = []
+    for i in range(n):
+        f = i / (n - 1)
+        a = math.sin((1.0 - f) * omega) / sin_omega
+        b = math.sin(f * omega) / sin_omega
+        x, y, z = (a * p + b * q for p, q in zip(v1, v2))
+        points.append((math.degrees(math.asin(z)), math.degrees(math.atan2(y, x))))
+    return points

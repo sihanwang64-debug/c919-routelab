@@ -9,8 +9,9 @@ from __future__ import annotations
 import typer
 
 from routelab.airports import AirportDB
-from routelab.fuel import FuelPolicy, block_fuel
-from routelab.performance import ProxyAircraft, trip_fuel_kg, trip_time_h, usable_fuel_at_payload
+from routelab.fuel import FuelPolicy
+from routelab.performance import ProxyAircraft
+from routelab.planning import plan_leg
 
 app = typer.Typer(
     add_completion=False,
@@ -41,32 +42,24 @@ def route_range(
 ) -> None:
     """Estimated trip time and simplified block fuel for one route (proxy aircraft)."""
     db = AirportDB()
-    route = db.route(origin, destination)
-    trip = trip_fuel_kg(_PROXY, route.distance_km, headwind)
-    alternate_note = "300 km diversion"
-    alternate_distance_km = 300.0
-    if alternate:
-        alternate_distance_km = db.route(destination, alternate).distance_km
-        alternate_note = f"to {alternate.upper()}"
-    breakdown = block_fuel(_PROXY, trip, alternate_distance_km, _POLICY)
-    fuel_limit_kg = min(
-        _PROXY.max_fuel_kg, usable_fuel_at_payload(_PROXY, payload)
-    )
-    feasible = breakdown.block_kg <= fuel_limit_kg
+    plan = plan_leg(db, _PROXY, origin, destination, alternate, payload, headwind, _POLICY)
+    b = plan.fuel
+    feasible = plan.feasible
     lines = [
-        f"Route        {route.origin} -> {route.destination}  {route.distance_km:.0f} km",
+        f"Route        {plan.route.origin} -> {plan.route.destination}  "
+        f"{plan.route.distance_km:.0f} km",
         f"Aircraft     {_PROXY.name}",
-        f"Trip time    {trip_time_h(_PROXY, route.distance_km, headwind):.2f} h",
-        f"Trip fuel    {breakdown.trip_kg:.0f} kg",
-        f"Contingency  {breakdown.contingency_kg:.0f} kg (5%)",
-        f"Alternate    {breakdown.alternate_kg:.0f} kg ({alternate_note} + approach)",
-        f"Final rsv    {breakdown.final_reserve_kg:.0f} kg "
+        f"Trip time    {plan.trip_time_h:.2f} h",
+        f"Trip fuel    {b.trip_kg:.0f} kg",
+        f"Contingency  {b.contingency_kg:.0f} kg (5%)",
+        f"Alternate    {b.alternate_kg:.0f} kg ({plan.alternate_note} + approach)",
+        f"Final rsv    {b.final_reserve_kg:.0f} kg "
         f"({_POLICY.final_reserve_min:.0f} min hold)",
-        f"Taxi         {breakdown.taxi_kg:.0f} kg",
-        f"BLOCK        {breakdown.block_kg:.0f} kg",
+        f"Taxi         {b.taxi_kg:.0f} kg",
+        f"BLOCK        {b.block_kg:.0f} kg",
         (
-            f"Feasibility  payload {payload:.0f} kg + block {breakdown.block_kg:.0f} kg "
-            f"vs limit {fuel_limit_kg:.0f} kg -> "
+            f"Feasibility  payload {payload:.0f} kg + block {b.block_kg:.0f} kg "
+            f"vs limit {plan.fuel_limit_kg:.0f} kg -> "
             + ("OK" if feasible else "NOT FEASIBLE (cut payload or shorten route)")
         ),
         "Note         learning-grade estimate, not for flight planning.",
