@@ -8,6 +8,12 @@ const fmt = (v, d = 0) =>
 
 const state = { airports: [], presets: {} };
 
+// API returns lat_deg/lon_deg (Airport dataclass fields); add short aliases
+// once at load so every consumer can use a.lat / a.lon.
+function normalizeAirport(a) {
+  return { ...a, lat: a.lat_deg, lon: a.lon_deg };
+}
+
 // ------------------------------------------------------------- helpers
 
 function aircraftPayload() {
@@ -52,6 +58,12 @@ function arcPoints(lat1, lon1, lat2, lon2, n) {
     const f = i / (n - 1), a = Math.sin((1 - f) * w) / sw, b = Math.sin(f * w) / sw;
     const x = a * v1[0] + b * v2[0], y = a * v1[1] + b * v2[1], z = a * v1[2] + b * v2[2];
     pts.push([deg(Math.asin(z)), deg(Math.atan2(y, x))]);
+  }
+  // unwrap longitudes across the antimeridian so the drawn path stays
+  // continuous instead of snapping back across the map at +-180 deg
+  for (let i = 1; i < pts.length; i++) {
+    while (pts[i][1] - pts[i - 1][1] > 180) pts[i][1] -= 360;
+    while (pts[i][1] - pts[i - 1][1] < -180) pts[i][1] += 360;
   }
   return pts;
 }
@@ -224,7 +236,9 @@ function scheduleRender() {
 
 (async function init() {
   if (!window.Plotly) $("plot-error").style.display = "block";
-  [state.airports, state.presets] = await Promise.all([api("/api/airports"), api("/api/presets")]);
+  const [airports, presets] = await Promise.all([api("/api/airports"), api("/api/presets")]);
+  state.airports = airports.map(normalizeAirport);
+  state.presets = presets;
   fillSelects(); fillHotTemps();
   document.querySelectorAll("input,select").forEach((el) => {
     el.addEventListener("input", scheduleRender);
