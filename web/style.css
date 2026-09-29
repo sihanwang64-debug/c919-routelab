@@ -1,0 +1,34 @@
+:root { --ink:#1f2933; --muted:#616e7c; --line:#e4e7eb; --accent:#c0392b; --bg:#f7f8f9; }
+* { box-sizing: border-box; }
+body { margin:0; font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; color:var(--ink); background:var(--bg); }
+header { background:#fff; border-bottom:1px solid var(--line); padding:14px 22px; }
+header h1 { margin:0; font-size:20px; }
+header p { margin:4px 0 0; font-size:12.5px; color:var(--muted); }
+.wrap { display:flex; gap:18px; padding:18px 22px; align-items:flex-start; }
+aside { width:270px; flex:none; background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; }
+main { flex:1; min-width:0; }
+.field { margin-bottom:10px; }
+.field label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+.field input[type=number], .field select { width:100%; padding:5px 7px; border:1px solid var(--line); border-radius:6px; font-size:13px; }
+.group { font-size:12px; font-weight:600; border-top:1px solid var(--line); padding-top:10px; margin-top:12px; }
+.group:first-child { border-top:none; margin-top:0; padding-top:0; }
+.tabs { display:flex; gap:8px; margin-bottom:14px; }
+.tabs button { border:1px solid var(--line); background:#fff; padding:8px 16px; border-radius:8px; font-size:14px; cursor:pointer; }
+.tabs button.active { border-color:var(--accent); color:var(--accent); font-weight:600; }
+.card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+.note-card { font-size:12px; color:var(--muted); }
+.metrics { display:flex; flex-wrap:wrap; gap:12px; }
+.metric { flex:1; min-width:130px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+.metric .k { font-size:12px; color:var(--muted); }
+.metric .v { font-size:20px; font-weight:600; margin-top:2px; }
+table { border-collapse:collapse; width:100%; font-size:13px; }
+th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:right; }
+th:first-child, td:first-child { text-align:left; }
+.cols { display:flex; gap:14px; flex-wrap:wrap; }
+.cols > * { flex:1; min-width:300px; }
+.ok { color:#1e8e3e; } .bad { color:var(--accent); }
+.note { font-size:12px; color:var(--muted); }
+#plot-error { display:none; background:#fdecea; color:#b71c1c; border:1px solid #f5c6cb; border-radius:8px; padding:10px 14px; margin:14px 22px; }
+footer { padding:8px 22px 22px; font-size:12px; color:var(--muted); }
+.temp-grid { display:flex; gap:14px; flex-wrap:wrap; }
+.temp-grid .field { width:150px; }

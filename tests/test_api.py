@@ -1,0 +1,82 @@
+"""API tests: endpoints agree with the underlying package computation."""
+
+from __future__ import annotations
+
+import pytest
+
+pytest.importorskip("fastapi", reason="server extra not installed")
+pytest.importorskip("httpx", reason="httpx not installed")
+from fastapi.testclient import TestClient  # noqa: E402
+
+from routelab.airports import AirportDB  # noqa: E402
+from routelab.performance import ProxyAircraft  # noqa: E402
+from routelab.planning import plan_leg  # noqa: E402
+from server import app  # noqa: E402
+
+client = TestClient(app)
+
+
+def test_airports_endpoint_lists_bundled_sample() -> None:
+    res = client.get("/api/airports")
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == len(AirportDB().all())
+    zspd = next(a for a in body if a["ident"] == "ZSPD")
+    assert zspd["iata"] == "PVG"
+    assert zspd["runway_m"] == 4000.0
+
+
+def test_presets_endpoint_has_three_aircraft() -> None:
+    body = client.get("/api/presets").json()
+    assert len(body) == 3
+    assert all("mtow_kg" in v for v in body.values())
+
+
+def test_route_endpoint_matches_plan_leg() -> None:
+    res = client.post("/api/route", json={
+        "origin": "ZSPD", "destination": "ZWWW", "alternate": "ZWSH",
+        "payload_kg": 15_000, "headwind_kmh": 0,
+    })
+    assert res.status_code == 200
+    body = res.json()
+    plan = plan_leg(AirportDB(), ProxyAircraft(), "ZSPD", "ZWWW", "ZWSH", 15_000)
+    assert body["distance_km"] == pytest.approx(plan.route.distance_km)
+    assert body["block_kg"] == pytest.approx(plan.fuel.block_kg)
+    assert body["feasible"] is plan.feasible
+    assert body["max_payload_on_leg_kg"] == pytest.approx(plan.max_payload_on_leg_kg)
+
+
+def test_route_unknown_airport_returns_404() -> None:
+    res = client.post("/api/route", json={"origin": "ZSPD", "destination": "XXXX"})
+    assert res.status_code == 404
+
+
+def test_envelope_endpoint_monotonic() -> None:
+    res = client.post("/api/envelope", json={"reserve_kg": 2_500})
+    assert res.status_code == 200
+    body = res.json()
+    ranges = body["max_range_km"]
+    assert len(ranges) == len(body["payload_kg"])
+    assert all(b >= a - 1e-6 for a, b in zip(ranges, ranges[1:]))
+
+
+def test_hot_endpoint_returns_margins_and_critical_temp() -> None:
+    res = client.post("/api/hot", json={
+        "airports": [{"ident": "ZSPD", "temp_c": 33}, {"ident": "ZWSH", "temp_c": 34}],
+    })
+    assert res.status_code == 200
+    rows = {r["ident"]: r for r in res.json()}
+    assert rows["ZWSH"]["margin_m"] < rows["ZSPD"]["margin_m"]
+    assert rows["ZWSH"]["critical_temp_c"] is not None
+    assert rows["ZSPD"]["elevation_ft"] == 13
+
+
+def test_hot_unknown_airport_returns_404() -> None:
+    res = client.post("/api/hot", json={"airports": [{"ident": "XXXX", "temp_c": 30}]})
+    assert res.status_code == 404
+
+
+def test_frontend_index_served() -> None:
+    res = client.get("/")
+    assert res.status_code == 200
+    assert "航线运行分析台" in res.text

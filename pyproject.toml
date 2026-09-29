@@ -36,10 +36,15 @@ app = [
     "streamlit>=1.36",
     "plotly>=5.22",
 ]
+server = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "mkdocs-material>=9.5",
+    "httpx>=0.27",
 ]
 
 [project.scripts]

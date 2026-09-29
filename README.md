@@ -27,7 +27,7 @@
 - ✈️ 同级代理机型性能模型（用公开资料的 A320neo 级参数近似 C919，诚实标注，后续可切换 [OpenAP](https://github.com/junzis/openap)）
 - 📊 业载-航程包线（payload–range envelope）
 - ⛽ 简化油量政策，逐项输出 breakdown
-- 🖥️ Streamlit 交互式 Web 界面：地图选航线、拖参数实时出图（见下文 [Web 界面](#web-界面streamlit)）
+- 🖥️ Web 界面（前后端分离：FastAPI 后端 `server.py` + 原生 HTML/JS 前端 `web/`，双击 `start_webapp.bat` 即用）/ Streamlit 版 / CLI，计算层同源、数字一致
 - 🧪 pytest 单元测试 + GitHub Actions CI + MkDocs 文档
 - 🗣️ 中 / 英 / 法三语文档
 
@@ -48,20 +48,36 @@ routelab range ZSPD ZWWW --alternate ZWSH --payload 15000
 routelab airports --country CN
 ```
 
-不想敲命令行？直接用 [Web 界面](#web-界面streamlit)，选选机场拖拖滑块就有同样的结果。
+不想敲命令行？双击 `start_webapp.bat` 打开 [Web 界面](#web-界面前后端分离fastapi--原生-htmljs)，选选机场拖拖参数就有同样的结果。
 
-## Web 界面（Streamlit）
+## Web 界面（前后端分离：FastAPI + 原生 HTML/JS）
 
-装上可选依赖，一条命令起本地服务：
+**启动（Windows 最快路径）**：双击仓库根目录的 `start_webapp.bat` —— 自动选 venv/系统 Python、起后端并打开浏览器 [http://127.0.0.1:8300](http://127.0.0.1:8300)（`Ctrl+C` 停止）。
+
+**手动启动**：
 
 ```bash
-pip install -e ".[app]"     # 核心包 + streamlit + plotly
-streamlit run app.py        # 浏览器自动打开 http://localhost:8501
+pip install -e ".[server]"     # 核心包 + fastapi + uvicorn
+python run_server.py           # 或：uvicorn server:app --port 8300 --reload
 ```
 
-> 首次运行 Streamlit 可能要求填写邮箱（直接留空回车即可）；停止服务在终端按 `Ctrl+C`。机场数据内置，离线可用。
+**架构**（后续开发就按这个分层走）：
 
-界面分三个标签页，左侧边栏是全局参数。
+```
+浏览器 web/（index.html + app.js + style.css，只做展示与交互）
+    │  fetch /api/*
+    ▼
+server.py（FastAPI：REST API + 托管 web/ 静态文件，交互式文档在 /docs）
+    │  直接调用
+    ▼
+src/routelab/（计算内核：airports / performance / fuel / planning / presets）
+```
+
+- 后端接口：`GET /api/airports`、`GET /api/presets`、`POST /api/route`（航段计划）、`POST /api/envelope`（业载-航程）、`POST /api/hot`（场长余量）
+- 所有数字由 Python 包计算，前端零业务逻辑——CLI、Streamlit、Web 三个入口同源，数字永远一致
+- 后端加功能 = 在 `routelab` 包里写函数 + 在 `server.py` 暴露端点；前端只需调接口
+
+三个标签页的用法（左侧边栏为全局参数）：
 
 ### 🛫 航线规划
 
@@ -73,14 +89,14 @@ streamlit run app.py        # 浏览器自动打开 http://localhost:8501
 
 ### 📊 业载-航程
 
-- 拖动**储备油扣减**滑块，整组包线左移——直观体会"手册航程是含储备的"；
+- 调整**储备油扣减**，整组包线左移——直观体会"手册航程是含储备的"；
 - 勾选对比机型（A320neo / 737 MAX 8 / C919 估计值），与"当前自定义机型"同图对比，悬停曲线读任意业载点的最大航程。
 
 ![业载-航程页](docs/img/app-envelope-tab.png)
 
 ### 🌡️ 高原高温
 
-- 勾选机场（默认浦东 / 乌鲁木齐 / 喀什 / 昆明），为每个机场设定假设温度；
+- 为 8 个国内样本机场分别设定假设温度（默认七月午后情景）；
 - 表格与柱状图输出：需要场长 vs 可用跑道的**余量**，以及"热到几度顶满跑道"的**临界温度**。
 
 ![高原高温页](docs/img/app-hothigh-tab.png)
@@ -96,7 +112,7 @@ streamlit run app.py        # 浏览器自动打开 http://localhost:8501
 | 最终储备 | 30 min（ICAO 惯例）或 45 min（CCAR-121 国内惯例） | 30 min |
 | 滑行油 | 固定滑行 allowance | 200 kg |
 
-Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两边数字永远一致。
+Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两边数字永远一致。仓库里另有等价的 Streamlit 版（`app.py`，`pip install -e ".[app]"` 后 `streamlit run app.py`）。
 
 （可选）研究级性能模型：`pip install -e ".[perf]"` 安装 OpenAP 后端（规划中，见路线图）。
 
@@ -120,6 +136,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 
 - [x] v0.1 仓库骨架：CLI + 大圆 + 机场数据 + 性能/油量内核 + CI
 - [x] v0.2 业载-航程案例 notebook + 高原高温案例 notebook
+- [x] 前后端分离 Web 版：FastAPI API（`server.py`）+ 原生前端（`web/`），`start_webapp.bat` 一键启动
 - [x] Streamlit Web 界面（`app.py`：地图航线规划 / 交互包线 / 高原高温）
 - [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
 - [ ] OpenAP 研究级性能后端封装（可选 extra，规划中）
