@@ -6,7 +6,7 @@
 <title>c919-routelab · 航线运行分析台</title>
 <script src="vendor/plotly.min.js"></script>
 <script>window.Plotly || document.write('<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"><\/script>');</script>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <header>
@@ -73,12 +73,16 @@
     <section class="sgroup">
       <h2>业载–航程</h2>
       <div class="field"><label>储备油扣减（t）</label><input type="number" id="p-reserve" value="2.5" step="0.1" min="0" max="5"></div>
-      <div class="field">
+      <div class="field" id="simple-compare-field">
         <label>对比机型</label>
         <label class="chk"><input type="checkbox" id="c-a320" checked> A320neo</label>
         <label class="chk"><input type="checkbox" id="c-max8" checked> 737 MAX 8</label>
         <label class="chk"><input type="checkbox" id="c-c919" checked> C919（估计）</label>
         <label class="chk"><input type="checkbox" id="c-custom" checked> 当前机型</label>
+      </div>
+      <div class="field" id="openap-compare-field" style="display:none">
+        <label>对比机型（OpenAP 型号）</label>
+        <div id="openap-compare"></div>
       </div>
     </section>
   </aside>
@@ -106,8 +110,9 @@
     </div>
 
     <div id="page-env" style="display:none">
+      <div id="env-loading" class="note" style="display:none">正在计算 OpenAP 包线（逐点积分，约需数秒到十几秒）……</div>
       <div class="card" id="env-chart"></div>
-      <div class="card note-card">C919 预设为公开报道 + 估计值（非官方数据），曲线为常数油耗教学模型。
+      <div class="card note-card" id="env-note">C919 预设为公开报道 + 估计值（非官方数据），曲线为常数油耗教学模型。
         调整左栏「储备油扣减」，包线整体左移——手册标称航程通常含储备。
         拐点含义：业载重于该点时受 MTOW 限制（油带不满），轻于该点时受油箱容量限制。</div>
     </div>
@@ -125,6 +130,6 @@
   <span>参数 · 公开手册量级与公开报道估计</span>
   <span><a href="https://github.com/sihanwang64-debug/c919-routelab" target="_blank" rel="noopener">GitHub 仓库</a></span>
 </footer>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

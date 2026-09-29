@@ -23,6 +23,11 @@ const THEME = {
 const BASE_FONT = { family: '"Segoe UI","Microsoft YaHei",sans-serif', size: 12, color: "#5a5f66" };
 const TITLE_FONT = { family: 'Georgia,"Times New Roman","SimSun",serif', size: 14, color: "#23272b" };
 const PLOTLY_CONFIG = { responsive: true, displayModeBar: false, scrollZoom: true };
+
+// Curated OpenAP types offered as envelope comparison series (common
+// narrowbodies); only those present in the installed OpenAP are shown.
+const OPENAP_COMPARE = ["a320", "a20n", "a321", "b738", "b38m"];
+const OPENAP_SERIES_COLORS = [THEME.accent, THEME.crimson, THEME.sage, THEME.ochre, THEME.slateLight];
 function chartLayout(extra) {
   return Object.assign({
     paper_bgcolor: "rgba(0,0,0,0)",
@@ -225,19 +230,37 @@ async function renderEnv() {
   const reserve = +$("p-reserve").value * 1000;
   let traces;
   if (backend() === "openap") {
-    let env;
+    // every checked OpenAP type becomes a series; fall back to the route
+    // actype when nothing is checked
+    const checked = [...document.querySelectorAll("#openap-compare input:checked")]
+      .map((c) => c.value);
+    const types = checked.length ? checked : [actype()];
+    let envs;
+    const loading = $("env-loading");
+    if (loading) loading.style.display = "";
     try {
-      env = await api("/api/envelope", {
-        aircraft: aircraftPayload(), reserve_kg: reserve,
-        backend: "openap", actype: actype(),
-      });
+      envs = await Promise.all(
+        types.map(async (t, i) => ({
+          t, i,
+          env: await api("/api/envelope", {
+            aircraft: aircraftPayload(), reserve_kg: reserve,
+            backend: "openap", actype: t, step_kg: 500,
+          }),
+        }))
+      );
       clearApiError();
-    } catch (err) { showApiError(err); return; }
-    traces = [{
+    } catch (err) {
+      showApiError(err);
+    } finally {
+      if (loading) loading.style.display = "none";
+    }
+    if (!envs) return;
+    traces = envs.map(({ t, i, env }) => ({
       x: env.payload_kg.map((p) => p / 1000), y: env.max_range_km.map((r) => r / 1000),
-      mode: "lines", name: `${env.actype}（OpenAP）`, line: { color: THEME.accent, width: 2.2 },
-      hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + env.actype + " (OpenAP)</extra>",
-    }];
+      mode: "lines", name: t.toUpperCase() + " (OpenAP)",
+      line: { color: OPENAP_SERIES_COLORS[i % OPENAP_SERIES_COLORS.length], width: 2 },
+      hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + t.toUpperCase() + "</extra>",
+    }));
   } else {
     const jobs = [];
     if ($("c-custom").checked) jobs.push(["当前机型", aircraftPayload(), THEME.crimson, 2.4]);
@@ -272,6 +295,10 @@ async function renderEnv() {
     hovermode: "x unified",
     legend: { orientation: "h", y: -0.22, x: 0 },
   }), PLOTLY_CONFIG);
+  const note = $("env-note");
+  if (note) note.textContent = backend() === "openap"
+    ? "OpenAP 模型基于公开科研数据（BADA 派生），油耗随重量逐点积分；个别新机型（如 a20n）的数据偏乐观，读数时注意甄别。C919 无公开模型，a320 为同级别代理。"
+    : "C919 预设为公开报道 + 估计值（非官方数据），曲线为常数油耗教学模型。调整左栏「储备油扣减」，包线整体左移——手册标称航程通常含储备。拐点含义：业载重于该点时受 MTOW 限制（油带不满），轻于该点时受油箱容量限制。";
 }
 
 // ------------------------------------------------------------- tab 3
@@ -337,17 +364,22 @@ function scheduleRender() {
 
 // OpenAP mode: MTOW/OEW/burn/TAS come from the OpenAP database, so the
 // corresponding sidebar inputs stop applying; tank/payload caps stay live.
+// Comparison switches from the simple-model presets to OpenAP type codes.
+function fillOpenapCompare() {
+  const available = OPENAP_COMPARE.filter((t) => state.aircraftTypes.includes(t));
+  const list = available.length ? available : state.aircraftTypes.slice(0, 5);
+  $("openap-compare").innerHTML = list
+    .map((t) => `<label class="chk"><input type="checkbox" value="${t}" checked> ${t.toUpperCase()}</label>`)
+    .join("");
+}
+
 function applyBackendMode() {
   const openapMode = backend() === "openap";
   $("actype-field").style.display = openapMode ? "" : "none";
   $("backend-note").style.display = openapMode ? "" : "none";
+  $("openap-compare-field").style.display = openapMode ? "" : "none";
+  $("simple-compare-field").style.display = openapMode ? "none" : "";
   for (const id of ["p-mtow", "p-oew", "p-flow", "p-tas"]) $(id).disabled = openapMode;
-  for (const id of ["c-a320", "c-max8", "c-c919"]) {
-    $(id).disabled = openapMode;
-    if (openapMode) $(id).checked = false;
-  }
-  $("c-custom").disabled = openapMode;
-  $("c-custom").checked = !openapMode ? $("c-custom").checked : true;
 }
 
 (async function init() {
@@ -376,7 +408,7 @@ function applyBackendMode() {
   }
   $("p-backend").addEventListener("change", () => { applyBackendMode(); scheduleRender(); });
   applyBackendMode();
-  fillSelects(); fillHotTemps();
+  fillSelects(); fillHotTemps(); fillOpenapCompare();
   document.querySelectorAll("input,select").forEach((el) => {
     el.addEventListener("input", scheduleRender);
     el.addEventListener("change", scheduleRender);

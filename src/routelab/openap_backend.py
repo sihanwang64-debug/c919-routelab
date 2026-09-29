@@ -30,7 +30,7 @@ CLIMB_DESCENT_H = 0.2  # same fixed allowance as the simple backend
 DEFAULT_CRUISE_ALT_FT = 35_000.0
 DEFAULT_MACH = 0.78
 FT_TO_M = 0.3048
-_EULER_STEP_S = 60.0  # integration step; fuel flow changes slowly with mass
+_EULER_STEP_S = 120.0  # integration step; fuel flow changes slowly with mass
 
 
 def is_available() -> bool:
