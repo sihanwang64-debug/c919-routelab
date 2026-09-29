@@ -3,53 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>c919-routelab ✈️ 航线运行分析台</title>
+<title>c919-routelab · 航线运行分析台</title>
 <script src="vendor/plotly.min.js"></script>
 <script>window.Plotly || document.write('<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"><\/script>');</script>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <header>
-  <h1>c919-routelab ✈️ 航线运行分析台</h1>
-  <p>基于公开数据的学习级工具（非官方，不可用于飞行计划/工程）—— A320neo 级代理机型近似 C919。
-     计算全部在后端 <code>routelab</code> Python 包完成，本页只做展示与交互（API 文档：<a href="/docs" target="_blank">/docs</a>）。</p>
+  <div class="header-row">
+    <div class="brand">
+      <span class="wordmark">c919-routelab</span>
+      <span class="sub">航线运行分析台</span>
+    </div>
+    <a class="docs-link" href="/docs" target="_blank" rel="noopener">API 文档</a>
+  </div>
+  <p class="tagline">基于公开数据的学习级工具 · 非官方，不可用于飞行计划或工程 · 以 A320neo 级代理机型近似 C919 · 计算由后端 routelab 包完成</p>
 </header>
+
 <div id="plot-error">图表库（Plotly）加载失败——本地副本 vendor/plotly.min.js 与 CDN 均不可用，请刷新重试。</div>
+
 <div class="wrap">
   <aside>
-    <div class="group">机型参数（A320neo 级代理，可调）
-      <div class="field"><label>MTOW (t)</label><input type="number" id="p-mtow" value="79.0" step="0.5" min="60" max="100"></div>
-      <div class="field"><label>OEW (t)</label><input type="number" id="p-oew" value="44.3" step="0.5" min="35" max="65"></div>
-      <div class="field"><label>最大油量 (t)</label><input type="number" id="p-fuel" value="19.0" step="0.5" min="10" max="30"></div>
-      <div class="field"><label>最大业载 (t)</label><input type="number" id="p-pay" value="18.5" step="0.5" min="10" max="30"></div>
-      <div class="field"><label>巡航油耗 (kg/h)</label><input type="number" id="p-flow" value="2300" step="50" min="1200" max="3000"></div>
-      <div class="field"><label>巡航 TAS (km/h)</label><input type="number" id="p-tas" value="833" step="5" min="700" max="950"></div>
-    </div>
-    <div class="group">运行条件
-      <div class="field"><label>业载 (t)</label><input type="number" id="p-payload" value="15.0" step="0.5" min="0" max="25"></div>
-      <div class="field"><label>巡航顶风 (km/h，负为顺风)</label><input type="number" id="p-wind" value="0" step="5" min="-80" max="120"></div>
-    </div>
-    <div class="group">油量政策
-      <div class="field"><label>绕飞比例 (%)</label><input type="number" id="p-cont" value="5" step="0.5" min="0" max="10"></div>
-      <div class="field"><label>最终储备</label><select id="p-fr"><option value="30">30 min（ICAO 惯例）</option><option value="45">45 min（CCAR-121 国内）</option></select></div>
-      <div class="field"><label>滑行油 (kg)</label><input type="number" id="p-taxi" value="200" step="50" min="0" max="500"></div>
-      <div class="field"><label>备降进近 allowance (kg)</label><input type="number" id="p-appr" value="200" step="50" min="0" max="500"></div>
-    </div>
-    <div class="group">业载-航程页
-      <div class="field"><label>储备油扣减 (t)</label><input type="number" id="p-reserve" value="2.5" step="0.1" min="0" max="5"></div>
-      <div class="field"><label>对比机型</label>
-        <label style="font-size:13px"><input type="checkbox" id="c-a320" checked> A320neo</label><br>
-        <label style="font-size:13px"><input type="checkbox" id="c-max8" checked> 737 MAX 8</label><br>
-        <label style="font-size:13px"><input type="checkbox" id="c-c919" checked> C919（估计）</label><br>
-        <label style="font-size:13px"><input type="checkbox" id="c-custom" checked> 当前自定义机型</label>
+    <section class="sgroup">
+      <h2>机型参数</h2>
+      <div class="field"><label>MTOW（t）</label><input type="number" id="p-mtow" value="79.0" step="0.5" min="60" max="100"></div>
+      <div class="field"><label>OEW（t）</label><input type="number" id="p-oew" value="44.3" step="0.5" min="35" max="65"></div>
+      <div class="field"><label>最大油量（t）</label><input type="number" id="p-fuel" value="19.0" step="0.5" min="10" max="30"></div>
+      <div class="field"><label>最大业载（t）</label><input type="number" id="p-pay" value="18.5" step="0.5" min="10" max="30"></div>
+      <div class="field"><label>巡航油耗（kg/h）</label><input type="number" id="p-flow" value="2300" step="50" min="1200" max="3000"></div>
+      <div class="field"><label>巡航 TAS（km/h）</label><input type="number" id="p-tas" value="833" step="5" min="700" max="950"></div>
+    </section>
+
+    <section class="sgroup">
+      <h2>运行条件</h2>
+      <div class="field"><label>业载（t）</label><input type="number" id="p-payload" value="15.0" step="0.5" min="0" max="25"></div>
+      <div class="field"><label>巡航顶风（km/h，负为顺风）</label><input type="number" id="p-wind" value="0" step="5" min="-80" max="120"></div>
+    </section>
+
+    <section class="sgroup">
+      <h2>油量政策</h2>
+      <div class="field"><label>绕飞比例（%）</label><input type="number" id="p-cont" value="5" step="0.5" min="0" max="10"></div>
+      <div class="field"><label>最终储备</label>
+        <select id="p-fr">
+          <option value="30">30 min · ICAO 惯例</option>
+          <option value="45">45 min · CCAR-121 国内</option>
+        </select>
       </div>
-    </div>
+      <div class="field"><label>滑行油（kg）</label><input type="number" id="p-taxi" value="200" step="50" min="0" max="500"></div>
+      <div class="field"><label>备降进近 allowance（kg）</label><input type="number" id="p-appr" value="200" step="50" min="0" max="500"></div>
+    </section>
+
+    <section class="sgroup">
+      <h2>业载–航程</h2>
+      <div class="field"><label>储备油扣减（t）</label><input type="number" id="p-reserve" value="2.5" step="0.1" min="0" max="5"></div>
+      <div class="field">
+        <label>对比机型</label>
+        <label class="chk"><input type="checkbox" id="c-a320" checked> A320neo</label>
+        <label class="chk"><input type="checkbox" id="c-max8" checked> 737 MAX 8</label>
+        <label class="chk"><input type="checkbox" id="c-c919" checked> C919（估计）</label>
+        <label class="chk"><input type="checkbox" id="c-custom" checked> 当前机型</label>
+      </div>
+    </section>
   </aside>
+
   <main>
     <div class="tabs">
-      <button id="tab-route" class="active" onclick="showTab('route')">🛫 航线规划</button>
-      <button id="tab-env" onclick="showTab('env')">📊 业载-航程</button>
-      <button id="tab-hot" onclick="showTab('hot')">🌡️ 高原高温</button>
+      <button id="tab-route" class="active" onclick="showTab('route')">航线规划</button>
+      <button id="tab-env" onclick="showTab('env')">业载–航程</button>
+      <button id="tab-hot" onclick="showTab('hot')">高原高温</button>
     </div>
 
     <div id="page-route">
@@ -60,7 +81,7 @@
       </div>
       <div class="card" id="map"></div>
       <div class="metrics" id="route-metrics"></div>
-      <div class="cols" style="margin-top:14px">
+      <div class="cols">
         <div class="card" id="fuel-chart"></div>
         <div class="card" id="fuel-table"></div>
       </div>
@@ -68,8 +89,8 @@
 
     <div id="page-env" style="display:none">
       <div class="card" id="env-chart"></div>
-      <div class="card note-card">C919 预设为公开报道+估计值（非官方数据）；曲线为常数油耗教学模型。
-        拖动左栏"储备油扣减"，包线整体左移——手册标称航程是含储备的。
+      <div class="card note-card">C919 预设为公开报道 + 估计值（非官方数据），曲线为常数油耗教学模型。
+        调整左栏「储备油扣减」，包线整体左移——手册标称航程通常含储备。
         拐点含义：业载重于该点时受 MTOW 限制（油带不满），轻于该点时受油箱容量限制。</div>
     </div>
 
@@ -80,10 +101,12 @@
     </div>
   </main>
 </div>
+
 <footer>
-  数据：OurAirports（公有领域）内置样本 · 参数：公开手册量级/公开报道+估计 ·
-  后端 <a href="https://github.com/sihanwang64-debug/c919-routelab">c919-routelab</a>（FastAPI + routelab 包）
+  <span>数据 · OurAirports 公有领域内置样本</span>
+  <span>参数 · 公开手册量级与公开报道估计</span>
+  <span><a href="https://github.com/sihanwang64-debug/c919-routelab" target="_blank" rel="noopener">GitHub 仓库</a></span>
 </footer>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

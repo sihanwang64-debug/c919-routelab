@@ -8,6 +8,31 @@ const fmt = (v, d = 0) =>
 
 const state = { airports: [], presets: {} };
 
+// ------------------------------------------------------- chart theme
+
+const THEME = {
+  ink: "#23272b",
+  muted: "#7a756c",
+  grid: "#e7e4dc",
+  accent: "#2f4f6f",
+  crimson: "#a63d40",
+  sage: "#4a7c59",
+  ochre: "#b08a3e",
+  slateLight: "#a9b8c4",
+};
+const BASE_FONT = { family: '"Segoe UI","Microsoft YaHei",sans-serif', size: 12, color: "#5a5f66" };
+const TITLE_FONT = { family: 'Georgia,"Times New Roman","SimSun",serif', size: 14, color: "#23272b" };
+const PLOTLY_CONFIG = { responsive: true, displayModeBar: false, scrollZoom: true };
+function chartLayout(extra) {
+  return Object.assign({
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    font: BASE_FONT,
+    hoverlabel: { bgcolor: "#23272b", bordercolor: "#23272b", font: { color: "#f6f5f1", size: 12 } },
+    margin: { l: 60, r: 14, t: 40, b: 40 },
+  }, extra);
+}
+
 // API returns lat_deg/lon_deg (Airport dataclass fields); add short aliases
 // once at load so every consumer can use a.lat / a.lon.
 function normalizeAirport(a) {
@@ -98,12 +123,12 @@ async function renderRoute() {
   const alt = altV !== "-" ? state.airports.find((a) => a.ident === altV) : null;
 
   $("route-metrics").innerHTML = `
-    <div class="metric"><div class="k">航距</div><div class="v">${fmt(plan.distance_km)} km<br><span class="note">${fmt(plan.distance_nm)} NM</span></div></div>
-    <div class="metric"><div class="k">航程时间</div><div class="v">${plan.trip_time_h.toFixed(2)} h</div></div>
-    <div class="metric"><div class="k">轮档油</div><div class="v">${fmt(plan.block_kg)} kg</div></div>
-    <div class="metric"><div class="k">本航段可带业载</div><div class="v">${(plan.max_payload_on_leg_kg / 1000).toFixed(1)} t</div></div>
+    <div class="metric"><div class="k">航距</div><div class="v">${fmt(plan.distance_km)} km<span class="note">${fmt(plan.distance_nm)} NM</span></div></div>
+    <div class="metric"><div class="k">航程时间</div><div class="v">${plan.trip_time_h.toFixed(2)}<span class="note">h</span></div></div>
+    <div class="metric"><div class="k">轮档油</div><div class="v">${fmt(plan.block_kg)}<span class="note">kg</span></div></div>
+    <div class="metric"><div class="k">本航段可带业载</div><div class="v">${(plan.max_payload_on_leg_kg / 1000).toFixed(1)}<span class="note">t</span></div></div>
     <div class="metric"><div class="k">业载 ${$("p-payload").value} t 可行性</div>
-      <div class="v ${plan.feasible ? "ok" : "bad"}">${plan.feasible ? "✅ 可行" : "❌ 超限"}</div></div>`;
+      <div class="v ${plan.feasible ? "ok" : "bad"}">${plan.feasible ? "可行" : "超限"}</div></div>`;
 
   $("fuel-table").innerHTML = `<table><tr><th>项目</th><th>kg</th></tr>
     <tr><td>航程油</td><td>${fmt(plan.trip_kg)}</td></tr>
@@ -119,15 +144,16 @@ async function renderRoute() {
   const traces = [{
     type: "scattergeo", mode: "lines",
     lon: arc.map((p) => p[1]), lat: arc.map((p) => p[0]),
-    line: { width: 2.5, color: "crimson" }, showlegend: false, hoverinfo: "skip",
+    line: { width: 2, color: THEME.crimson }, showlegend: false, hoverinfo: "skip",
   }];
-  const marks = [[o, "出发", "blue"], [d, "到达", "green"]];
-  if (alt) marks.push([alt, "备降", "orange"]);
+  const marks = [[o, "出发", THEME.accent], [d, "到达", THEME.sage]];
+  if (alt) marks.push([alt, "备降", THEME.ochre]);
   for (const [ap, role, color] of marks) {
     traces.push({
       type: "scattergeo", mode: "markers+text", lon: [ap.lon], lat: [ap.lat],
       text: [ap.ident], textposition: "top center",
-      marker: { size: 10, color }, name: `${role} ${ap.ident}`,
+      marker: { size: 8, color }, name: `${role} ${ap.ident}`,
+      textfont: { size: 11, color: "#4a4f55" },
       hovertext: `${ap.ident} ${ap.name}｜标高 ${fmt(ap.elev_ft)} ft｜跑道 ${fmt(ap.runway_m)} m`,
     });
   }
@@ -136,24 +162,33 @@ async function renderRoute() {
     traces.push({
       type: "scattergeo", mode: "lines",
       lon: arc2.map((p) => p[1]), lat: arc2.map((p) => p[0]),
-      line: { width: 1.8, color: "orange", dash: "dot" }, showlegend: false, hoverinfo: "skip",
+      line: { width: 1.4, color: THEME.ochre, dash: "dot" }, showlegend: false, hoverinfo: "skip",
     });
   }
-  Plotly.react("map", traces, {
-    height: 430, margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: true,
+  Plotly.react("map", traces, chartLayout({
+    height: 440, margin: { l: 0, r: 0, t: 0, b: 0 }, showlegend: false,
     geo: {
-      projection: { type: "natural earth" }, showland: true, landcolor: "rgb(242,240,236)",
-      showcountries: true, countrycolor: "grey", fitbounds: "locations",
+      projection: { type: "natural earth" }, showland: true, landcolor: "#eceae3",
+      showcountries: true, countrycolor: "#cfcabf", showcoastlines: false,
+      bgcolor: "rgba(0,0,0,0)", fitbounds: "locations",
+      // keep default resolution (110m): 50m topojson is fetched from the CDN,
+      // which breaks offline / flaky-network use
     },
-  }, { responsive: true });
+  }), PLOTLY_CONFIG);
 
   Plotly.react("fuel-chart", [{
     type: "bar", orientation: "h",
     x: [plan.trip_kg, plan.contingency_kg, plan.alternate_kg, plan.final_reserve_kg, plan.taxi_kg],
-    y: ["航程", "绕飞", "备降", "最终储备", "滑行"], marker: { color: "indianred" },
+    y: ["航程", "绕飞", "备降", "最终储备", "滑行"], marker: { color: THEME.accent },
     text: [fmt(plan.trip_kg), fmt(plan.contingency_kg), fmt(plan.alternate_kg), fmt(plan.final_reserve_kg), fmt(plan.taxi_kg)],
-    textposition: "auto",
-  }], { title: "轮档油构成 (kg)", height: 300, margin: { l: 70, r: 20, t: 40, b: 20 } }, { responsive: true });
+    textposition: "outside", textfont: { size: 11, color: THEME.ink }, cliponaxis: false,
+    hoverinfo: "x",
+  }], chartLayout({
+    title: { text: "轮档油构成（kg）", font: TITLE_FONT, x: 0, xanchor: "left" },
+    height: 310, margin: { l: 74, r: 34, t: 44, b: 30 },
+    xaxis: { gridcolor: THEME.grid, zeroline: false },
+    yaxis: { ticks: "" },
+  }), PLOTLY_CONFIG);
 }
 
 // ------------------------------------------------------------- tab 2
@@ -162,23 +197,33 @@ async function renderEnv() {
   if (!window.Plotly) return;
   const reserve = +$("p-reserve").value * 1000;
   const jobs = [];
-  if ($("c-custom").checked) jobs.push(["当前自定义机型", aircraftPayload()]);
-  const presetJobs = [["c-a320", "A320neo (公开手册量级)"], ["c-max8", "737 MAX 8 (公开手册量级)"], ["c-c919", "C919 (公开报道+估计，非官方)"]];
-  for (const [id, key] of presetJobs)
-    if ($(id).checked && state.presets[key]) jobs.push([key, state.presets[key]]);
+  if ($("c-custom").checked) jobs.push(["当前机型", aircraftPayload(), THEME.crimson, 2.4]);
+  const presetDefs = [
+    ["c-a320", "A320neo (公开手册量级)", "A320neo", THEME.accent, 1.7],
+    ["c-max8", "737 MAX 8 (公开手册量级)", "737 MAX 8", THEME.sage, 1.7],
+    ["c-c919", "C919 (公开报道+估计，非官方)", "C919（估计）", THEME.ochre, 1.7],
+  ];
+  for (const [id, key, short, color, width] of presetDefs)
+    if ($(id).checked && state.presets[key]) jobs.push([short, state.presets[key], color, width]);
   const results = await Promise.all(
-    jobs.map(async ([label, aircraft]) => [label, await api("/api/envelope", { aircraft, reserve_kg: reserve })])
+    jobs.map(async ([label, aircraft, color, width]) => ({
+      label, color, width,
+      env: await api("/api/envelope", { aircraft, reserve_kg: reserve }),
+    }))
   );
-  const traces = results.map(([label, env]) => ({
+  const traces = results.map(({ label, color, width, env }) => ({
     x: env.payload_kg.map((p) => p / 1000), y: env.max_range_km.map((r) => r / 1000),
-    mode: "lines", name: label,
-    hovertemplate: "业载 %{x:.1f} t<br>航程 %{y:,} km<extra>" + label + "</extra>",
+    mode: "lines", name: label, line: { color, width },
+    hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + label + "</extra>",
   }));
-  Plotly.react("env-chart", traces, {
-    title: "业载-航程包线（含储备油）",
-    xaxis: { title: "业载 (t)" }, yaxis: { title: "最大航程 (1000 km)" },
-    height: 480, hovermode: "x unified", margin: { l: 60, r: 20, t: 50, b: 50 },
-  }, { responsive: true });
+  Plotly.react("env-chart", traces, chartLayout({
+    title: { text: "业载–航程包线（含储备油）", font: TITLE_FONT, x: 0, xanchor: "left" },
+    height: 470,
+    xaxis: { title: { text: "业载（t）" }, gridcolor: THEME.grid, zeroline: false },
+    yaxis: { title: { text: "最大航程（1000 km）" }, gridcolor: THEME.grid, zeroline: false },
+    hovermode: "x unified",
+    legend: { orientation: "h", y: -0.22, x: 0 },
+  }), PLOTLY_CONFIG);
 }
 
 // ------------------------------------------------------------- tab 3
@@ -208,9 +253,17 @@ async function renderHot() {
   if (!window.Plotly) return;
   const x = rows.map((r) => r.ident);
   Plotly.react("hot-chart", [
-    { x, y: rows.map((r) => r.runway_m), type: "bar", name: "可用跑道", marker: { color: "seagreen" } },
-    { x, y: rows.map((r) => r.required_tofl_m), type: "bar", name: "需要场长（MTOW，无风）", marker: { color: "indianred" } },
-  ], { title: "启发式起飞场长 vs 可用跑道（m）", barmode: "group", height: 400, margin: { l: 60, r: 20, t: 50, b: 50 } }, { responsive: true });
+    { x, y: rows.map((r) => r.runway_m), type: "bar", name: "可用跑道",
+      marker: { color: THEME.slateLight } },
+    { x, y: rows.map((r) => r.required_tofl_m), type: "bar", name: "需要场长（MTOW，无风）",
+      marker: { color: THEME.crimson } },
+  ], chartLayout({
+    title: { text: "启发式起飞场长 vs 可用跑道（m）", font: TITLE_FONT, x: 0, xanchor: "left" },
+    height: 400, barmode: "group", bargap: 0.32,
+    xaxis: { ticks: "" },
+    yaxis: { gridcolor: THEME.grid, zeroline: false },
+    legend: { orientation: "h", y: -0.18, x: 0 },
+  }), PLOTLY_CONFIG);
 }
 
 // ------------------------------------------------------------- wiring
