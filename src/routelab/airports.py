@@ -103,13 +103,24 @@ class AirportDB:
         return list(self._airports)
 
     def max_runway_m(self, airport: Airport) -> float | None:
-        """Longest runway at the airport, in metres; None when unknown."""
+        """Longest runway at the airport, in metres; None when unknown.
+
+        Handles both OurAirports schemas: the bundled sample stores
+        ``length_m`` while the full dataset stores ``length_ft`` (converted
+        here at 1 ft = 0.3048 m).
+        """
         if self._runways is None:
             return None
         subset = self._runways[self._runways["airport_ident"] == airport.ident]
         if subset.empty:
             return None
-        lengths = pd.to_numeric(subset["length_m"], errors="coerce").dropna()
+        if "length_m" in subset.columns:
+            lengths = pd.to_numeric(subset["length_m"], errors="coerce")
+        elif "length_ft" in subset.columns:
+            lengths = pd.to_numeric(subset["length_ft"], errors="coerce") * 0.3048
+        else:
+            return None
+        lengths = lengths.dropna()
         return float(lengths.max()) if not lengths.empty else None
 
     def route(self, origin: str, destination: str) -> Route:

@@ -195,7 +195,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 | [01 业载-航程](cases/01_range_payload.ipynb) | C919（估计参数）vs A320neo vs 737 MAX 8 的业载-航程包线，谁被油箱卡住？OEW 敏感性多大？ | ✅ 已完成 |
 | [02 高原高温](cases/02_hot_high.ipynb) | 浦东—乌鲁木齐/喀什：高温高原机场的起降场长余量与备降油量 | ✅ 已完成 |
 | [03 延误传播](cases/03_delay_network.ipynb) | 机尾号轮转链上的延误传染：lift 检验、传播枢纽、机场流量（合成数据 + OpenSky 对照） | ✅ 已完成 |
-| 04 机队情景 | 2026–2030 假想航线网络覆盖与座位投放 | 📋 规划中 |
+| [04 机队情景](cases/04_fleet_scenario.ipynb) | 2026–2030 三种交付节奏下，机队何时撑起 18 条航线网络？座位投放与利用率敏感性 | ✅ 已完成 |
 
 ## 方法学与诚实话
 
@@ -212,14 +212,15 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 - [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
 - [x] OpenAP 研究级燃烧模型后端（`routelab/openap_backend.py`，CLI/API/界面均可切换）
 - [x] v0.3 延误传播网络分析：`network.py` 机尾链图 + lift/枢纽/流量指标 + 案例 03（合成数据验证方法学，OpenSky 实测对照带缓存与优雅回退）
-- [ ] v1.0 机队情景案例 + 打 tag
+- [x] v0.4 案例 04 机队情景 + 完整 OurAirports 数据集下载脚本（`scripts/download_airports.py`）
+- [x] v1.0 打 tag 发布（四个案例 + 双版本界面 + 两级性能模型齐备）
 
 ## 常见问题
 
 - **页面打开后图表空白？** 静态资源带版本号缓存，先按 `Ctrl+F5` 强制刷新；图表库已打包在 `web/vendor/`，正常情况无需联网。
 - **启动报 `WinError 10048`（端口被占用）？** 已有一个实例在运行——先关掉旧实例再启动（或修改 `run_server.py` 里的 `PORT`）。
 - **「性能模型」里 OpenAP 选项是灰色的？** 未安装 openap（`pip install -e ".[perf]"`）或 Python 版本低于 3.11。缺失时程序照常运行，只是该选项不可用。
-- **机场太少 / 想加机场？** 内置为 11 机场样本；下载完整 [OurAirports](https://ourairports.com/data/) 数据集后通过 `ROUTELAB_AIRPORTS_CSV` / `ROUTELAB_RUNWAYS_CSV` 环境变量接入，见[数据来源](docs/data-sources.md)。
+- **机场太少 / 想加机场？** 运行 `python scripts/download_airports.py` 下载完整数据集（86k 机场，含 ft→m 兼容），脚本会打印需要设置的两个环境变量，见[数据来源](docs/data-sources.md)。
 - **C919 的参数是官方的吗？** 不是——COMAC 未公开性能数据，参数来自公开报道与估计并逐项标注（见[方法学](docs/methodology.md)），仅作学习演示。
 
 ## English

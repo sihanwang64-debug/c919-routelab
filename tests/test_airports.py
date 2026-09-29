@@ -31,3 +31,24 @@ def test_by_country_and_runways(db):
     assert {a.ident for a in cn} >= {"ZSPD", "ZBAA", "ZWWW"}
     assert db.max_runway_m(db.get("ZPPP")) == pytest.approx(4500.0)
     assert db.max_runway_m(db.get("KJFK")) == pytest.approx(4423.0)
+
+
+def test_full_dataset_schema_length_ft_converted(tmp_path):
+    # the full OurAirports runways.csv stores length_ft, not length_m
+    airports_csv = tmp_path / "airports.csv"
+    airports_csv.write_text(
+        "ident,type,name,latitude_deg,longitude_deg,elevation_ft,continent,"
+        "iso_country,iso_region,municipality,scheduled_service,iata_code\n"
+        "ZTST,large_airport,Test Airport,31.0,121.0,13,AS,CN,CN-SH,Test,yes,TST\n",
+        encoding="utf-8",
+    )
+    runways_csv = tmp_path / "runways.csv"
+    runways_csv.write_text(
+        "id,airport_ref,airport_ident,length_ft,width_ft,surface,lighted,"
+        "closed,le_ident,he_ident\n"
+        "1,1000,ZTST,9842.5,148,ASPH,1,0,36L,36R\n",
+        encoding="utf-8",
+    )
+    db = AirportDB(airports_csv=airports_csv, runways_csv=runways_csv)
+    ap = db.get("ZTST")
+    assert db.max_runway_m(ap) == pytest.approx(9842.5 * 0.3048)

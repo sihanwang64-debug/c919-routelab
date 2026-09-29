@@ -7,7 +7,7 @@ All data used by this project comes from public sources.
 ### OurAirports (public domain)
 - What: worldwide airports and runways, community-maintained.
 - Used for: `src/routelab/data/ourairports/*.csv` — a **tiny hand-picked sample** so the toolkit works offline; coordinates and elevations are approximate.
-- Full dataset: <https://ourairports.com/data/> (public domain). Point `ROUTELAB_AIRPORTS_CSV` / `ROUTELAB_RUNWAYS_CSV` at the downloaded files; the loader reads the same column subset.
+- Full dataset: <https://ourairports.com/data/> (public domain). Run `python scripts/download_airports.py` to fetch both files (with retries) into `data_cache/ourairports/`, then point `ROUTELAB_AIRPORTS_CSV` / `ROUTELAB_RUNWAYS_CSV` at them as printed by the script. The loader accepts both column dialects (`length_m` in the bundled sample, `length_ft` in the full dataset, converted to metres).
 
 ## Planned
 
