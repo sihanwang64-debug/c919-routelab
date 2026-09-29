@@ -13,3 +13,6 @@ site/
 
 # local tooling (ZCode index config)
 .zcodeignore
+
+# local data caches (OpenSky etc.)
+data_cache/

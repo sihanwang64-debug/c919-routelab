@@ -60,3 +60,17 @@ This reproduces the classic textbook shape without pretending to certify-grad pr
 - Not a flight-planning or dispatch tool;
 - Not affiliated with or endorsed by COMAC;
 - Not based on any non-public data.
+
+## 8. Delay-propagation network (case 03)
+
+Three metrics over the tail-rotation chain (edges = consecutive legs of one airframe with a planned turnaround ≤ 180 min; overnight rests reset the chain):
+
+- **inheritance lift**: P(next delayed | current delayed) / P(next delayed);
+- **propagation hubs**: turnaround airports ranked by the share of turnarounds where a delayed inbound led to a delayed outbound;
+- **airport flow**: propagated pairs folded into a weighted airport graph (`sent` / `received` / `net`).
+
+Assumptions to argue about:
+
+- the synthetic generator (`synthesize_rotations`) **injects** propagation by construction (arrival delay minus schedule recovery plus an exogenous heavy-tailed perturbation; overnight rest resets), so its lift is a methodological acceptance test, not an empirical finding — all registrations carry a `SIM-` prefix;
+- the OpenSky importer uses `icao24` as the airframe identity (the REST endpoint has no civil registration) and a **pseudo-schedule** (route-median observed block time) because the endpoint publishes no timetable; anonymous OpenSky access is rate-limited, and the fetcher caches every success to disk and degrades gracefully when the network refuses;
+- crew rotations, maintenance, ATC slotting and connection passengers are all real propagation channels left unmodelled.

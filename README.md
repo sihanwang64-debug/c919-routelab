@@ -195,7 +195,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 |---|---|---|
 | [01 业载-航程](cases/01_range_payload.ipynb) | C919（估计参数）vs A320neo vs 737 MAX 8 的业载-航程包线，谁被油箱卡住？OEW 敏感性多大？ | ✅ 已完成 |
 | [02 高原高温](cases/02_hot_high.ipynb) | 浦东—乌鲁木齐/喀什：高温高原机场的起降场长余量与备降油量 | ✅ 已完成 |
-| 03 延误传播 | 实测航班数据里，延误如何沿机尾号链传播？ | 📋 规划中 |
+| [03 延误传播](cases/03_delay_network.ipynb) | 机尾号轮转链上的延误传染：lift 检验、传播枢纽、机场流量（合成数据 + OpenSky 对照） | ✅ 已完成 |
 | 04 机队情景 | 2026–2030 假想航线网络覆盖与座位投放 | 📋 规划中 |
 
 ## 方法学与诚实话
@@ -213,7 +213,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 - [x] Streamlit Web 界面（`app.py`：地图航线规划 / 交互包线 / 高原高温）
 - [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
 - [x] OpenAP 研究级燃烧模型后端（`routelab/openap_backend.py`，CLI/API/界面均可切换）
-- [ ] v0.3 OpenSky 延误传播网络分析（`network.py` + 案例 03）
+- [x] v0.3 延误传播网络分析：`network.py` 机尾链图 + lift/枢纽/流量指标 + 案例 03（合成数据验证方法学，OpenSky 实测对照带缓存与优雅回退）
 - [ ] v1.0 机队情景案例 + 打 tag
 
 ## 常见问题
