@@ -32,10 +32,6 @@ dependencies = [
 
 [project.optional-dependencies]
 perf = ["openap>=2.6"]
-app = [
-    "streamlit>=1.36",
-    "plotly>=5.22",
-]
 server = [
     "fastapi>=0.110",
     "uvicorn>=0.29",

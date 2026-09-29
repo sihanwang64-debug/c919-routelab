@@ -27,7 +27,7 @@
 - ✈️ 两级性能模型：简化常数油耗（默认）+ 可选 [OpenAP](https://github.com/junzis/openap) 研究级燃烧模型（油耗随重量变化，`pip install -e ".[perf]"`）
 - 📊 业载-航程包线（payload–range envelope）
 - ⛽ 简化油量政策，逐项输出 breakdown
-- 🖥️ Web 界面（前后端分离：FastAPI 后端 `server.py` + 原生 HTML/JS 前端 `web/`，双击 `start_webapp.bat` 即用）/ Streamlit 版 / CLI，计算层同源、数字一致
+- 🖥️ Web 界面（前后端分离：FastAPI 后端 `server.py` + 原生 HTML/JS 前端 `web/`，双击 `start_webapp.bat` 即用）+ CLI，计算层同源、数字一致
 - 🧪 pytest 单元测试 + GitHub Actions CI + MkDocs 文档
 - 🗣️ 中 / 英 / 法三语文档
 
@@ -91,7 +91,6 @@ mkdocs serve       # 本地预览文档站
 
 ```
 c919-routelab/
-├── app.py                  # Streamlit 版界面（与 Web 版等价的备选）
 ├── server.py               # FastAPI 后端：REST API + 托管前端
 ├── run_server.py           # 一键启动后端并打开浏览器
 ├── start_webapp.bat        # Windows 双击入口
@@ -134,7 +133,7 @@ src/routelab/（计算内核：airports / performance / fuel / planning / preset
 ```
 
 - 后端接口：`GET /api/airports`、`GET /api/presets`、`POST /api/route`（航段计划）、`POST /api/envelope`（业载-航程）、`POST /api/hot`（场长余量）
-- 所有数字由 Python 包计算，前端零业务逻辑——CLI、Streamlit、Web 三个入口同源，数字永远一致
+- 所有数字由 Python 包计算，前端零业务逻辑——CLI 与 Web 两个入口同源，数字永远一致
 - 后端加功能 = 在 `routelab` 包里写函数 + 在 `server.py` 暴露端点；前端只需调接口
 
 三个标签页的用法（左侧边栏为全局参数）：
@@ -172,7 +171,7 @@ src/routelab/（计算内核：airports / performance / fuel / planning / preset
 | 最终储备 | 30 min（ICAO 惯例）或 45 min（CCAR-121 国内惯例） | 30 min |
 | 滑行油 | 固定滑行 allowance | 200 kg |
 
-Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两边数字永远一致。仓库里另有等价的 Streamlit 版（`app.py`，`pip install -e ".[app]"` 后 `streamlit run app.py`）。
+Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两边数字永远一致。
 
 ## 性能模型：简化 vs OpenAP
 
@@ -210,7 +209,6 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 - [x] v0.1 仓库骨架：CLI + 大圆 + 机场数据 + 性能/油量内核 + CI
 - [x] v0.2 业载-航程案例 notebook + 高原高温案例 notebook
 - [x] 前后端分离 Web 版：FastAPI API（`server.py`）+ 原生前端（`web/`），`start_webapp.bat` 一键启动
-- [x] Streamlit Web 界面（`app.py`：地图航线规划 / 交互包线 / 高原高温）
 - [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
 - [x] OpenAP 研究级燃烧模型后端（`routelab/openap_backend.py`，CLI/API/界面均可切换）
 - [x] v0.3 延误传播网络分析：`network.py` 机尾链图 + lift/枢纽/流量指标 + 案例 03（合成数据验证方法学，OpenSky 实测对照带缓存与优雅回退）
@@ -226,11 +224,11 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 
 ## English
 
-**c919-routelab** is an open-source, learning-grade toolkit for route-level operations analysis of single-aisle airliners, built entirely on public data (OurAirports airports and runways, public aircraft specifications, later OpenSky ADS-B). Given an origin–destination pair it estimates great-circle distance, a payload–range envelope, heuristic takeoff field lengths with altitude/temperature corrections, and a simplified CCAR-121-style fuel breakdown (taxi, trip, 5% contingency, alternate, final reserve). The C919 has no open performance data, so a clearly documented A320neo-class proxy aircraft is used; an optional `openap` extra is planned to swap in a research-grade model. An optional Streamlit web app (`pip install -e ".[app]"` then `streamlit run app.py`) puts the same computation layer behind a GUI: a map-based route planner with great-circle drawing, an interactive payload-range chart with aircraft comparison, and hot-and-high field-length margins. Everything here is for education only — not for flight planning or engineering. See `docs/` for methodology and data sources. Requirements: Python 3.10+ for the core toolkit (fully offline at runtime); the optional research-grade burn model backed by [OpenAP](https://github.com/junzis/openap) (`pip install -e ".[perf]"`) needs Python 3.11+ and is auto-detected at runtime — without it, the constant-flow proxy model remains the default and everything else works unchanged.
+**c919-routelab** is an open-source, learning-grade toolkit for route-level operations analysis of single-aisle airliners, built entirely on public data (OurAirports airports and runways, public aircraft specifications, later OpenSky ADS-B). Given an origin–destination pair it estimates great-circle distance, a payload–range envelope, heuristic takeoff field lengths with altitude/temperature corrections, and a simplified CCAR-121-style fuel breakdown (taxi, trip, 5% contingency, alternate, final reserve). The C919 has no open performance data, so a clearly documented A320neo-class proxy aircraft is used; an optional `openap` extra is planned to swap in a research-grade model. An optional web app (FastAPI backend `server.py` + vanilla HTML/JS frontend in `web/`, launched via `python run_server.py` or `start_webapp.bat`) puts the same computation layer behind a GUI: a map-based route planner with great-circle drawing, an interactive payload-range chart with aircraft comparison, and hot-and-high field-length margins. Everything here is for education only — not for flight planning or engineering. See `docs/` for methodology and data sources. Requirements: Python 3.10+ for the core toolkit (fully offline at runtime); the optional research-grade burn model backed by [OpenAP](https://github.com/junzis/openap) (`pip install -e ".[perf]"`) needs Python 3.11+ and is auto-detected at runtime — without it, the constant-flow proxy model remains the default and everything else works unchanged.
 
 ## Français
 
-**c919-routelab** est une boîte à outils open source et pédagogique pour l'analyse opérationnelle des avions monocoulois, construite entièrement à partir de données publiques. Pour une paire origine–destination donnée, elle estime la distance orthodromique, l'enveloppe charge utile–distance, des longueurs de piste corrigées de l'altitude et de la température, ainsi qu'une décomposition simplifiée du carburant (roulage, trajet, contingence de 5 %, aérodrome de dégagement, réserve finale). En l'absence de données de performance ouvertes sur le C919, un appareil proxy de classe A320neo est utilisé et documenté. Une application web Streamlit optionnelle (`pip install -e ".[app]"` puis `streamlit run app.py`) propose la même couche de calcul en interface graphique : planification de routes sur carte, enveloppe charge–distance interactive et marges de longueur de piste en conditions chaudes et hautes. Réservé à l'apprentissage — pas pour le vol réel. Prérequis : Python 3.10+ pour le noyau (fonctionnement hors ligne) ; le modèle de combustion recherche optionnel [OpenAP](https://github.com/junzis/openap) (`pip install -e ".[perf]"`) requiert Python 3.11+ et est détecté automatiquement — sans lui, le modèle simplifié à flux constant reste le choix par défaut.
+**c919-routelab** est une boîte à outils open source et pédagogique pour l'analyse opérationnelle des avions monocoulois, construite entièrement à partir de données publiques. Pour une paire origine–destination donnée, elle estime la distance orthodromique, l'enveloppe charge utile–distance, des longueurs de piste corrigées de l'altitude et de la température, ainsi qu'une décomposition simplifiée du carburant (roulage, trajet, contingence de 5 %, aérodrome de dégagement, réserve finale). En l'absence de données de performance ouvertes sur le C919, un appareil proxy de classe A320neo est utilisé et documenté. Une application web optionnelle (backend FastAPI `server.py` + frontend HTML/JS dans `web/`, lancée via `python run_server.py` ou `start_webapp.bat`) propose la même couche de calcul en interface graphique : planification de routes sur carte, enveloppe charge–distance interactive et marges de longueur de piste en conditions chaudes et hautes. Réservé à l'apprentissage — pas pour le vol réel. Prérequis : Python 3.10+ pour le noyau (fonctionnement hors ligne) ; le modèle de combustion recherche optionnel [OpenAP](https://github.com/junzis/openap) (`pip install -e ".[perf]"`) requiert Python 3.11+ et est détecté automatiquement — sans lui, le modèle simplifié à flux constant reste le choix par défaut.
 
 ## License
 
