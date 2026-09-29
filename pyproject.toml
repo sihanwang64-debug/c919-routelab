@@ -45,7 +45,6 @@ dev = [
     "ruff>=0.4",
     "mkdocs-material>=9.5",
     "httpx>=0.27",
-    "openap>=2.6",
 ]
 
 [project.scripts]

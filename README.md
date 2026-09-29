@@ -114,7 +114,7 @@ src/routelab/（计算内核：airports / performance / fuel / planning / preset
 
 Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两边数字永远一致。仓库里另有等价的 Streamlit 版（`app.py`，`pip install -e ".[app]"` 后 `streamlit run app.py`）。
 
-（可选）研究级性能模型：`pip install -e ".[perf]"` 安装 OpenAP，然后在界面左上「性能模型」切换为 OpenAP 模式（机型下拉选 a320/b738 等 37 个型号）。
+（可选）研究级性能模型：`pip install -e ".[perf]"` 安装 OpenAP（要求 Python 3.11+），然后在界面左上「性能模型」切换为 OpenAP 模式（机型下拉选 a320/b738 等 37 个型号）。
 
 ## 案例集（cases/）
 
