@@ -27,6 +27,7 @@
 - ✈️ 同级代理机型性能模型（用公开资料的 A320neo 级参数近似 C919，诚实标注，后续可切换 [OpenAP](https://github.com/junzis/openap)）
 - 📊 业载-航程包线（payload–range envelope）
 - ⛽ 简化油量政策，逐项输出 breakdown
+- 🖥️ Streamlit 交互式 Web 界面：地图选航线、拖参数实时出图（见下文 [Web 界面](#web-界面streamlit)）
 - 🧪 pytest 单元测试 + GitHub Actions CI + MkDocs 文档
 - 🗣️ 中 / 英 / 法三语文档
 
@@ -47,20 +48,55 @@ routelab range ZSPD ZWWW --alternate ZWSH --payload 15000
 routelab airports --country CN
 ```
 
+不想敲命令行？直接用 [Web 界面](#web-界面streamlit)，选选机场拖拖滑块就有同样的结果。
+
 ## Web 界面（Streamlit）
 
+装上可选依赖，一条命令起本地服务：
+
 ```bash
-pip install -e ".[app]"
-streamlit run app.py
+pip install -e ".[app]"     # 核心包 + streamlit + plotly
+streamlit run app.py        # 浏览器自动打开 http://localhost:8501
 ```
 
-浏览器打开 http://localhost:8501，三个标签页：
+> 首次运行 Streamlit 可能要求填写邮箱（直接留空回车即可）；停止服务在终端按 `Ctrl+C`。机场数据内置，离线可用。
 
-- **🛫 航线规划**：选出发/到达/备降机场，世界地图上看大圆航线，实时输出轮档油构成、可带业载与可行性判定；
-- **📊 业载-航程**：拖动储备油扣减、机型对比（A320neo / 737 MAX 8 / C919 估计值 / 自定义机型），交互式包线图；
-- **🌡️ 高原高温**：选机场、改温度，看启发式起飞场长 vs 可用跑道的余量与临界温度。
+界面分三个标签页，左侧边栏是全局参数。
 
-侧栏可调机型参数（MTOW/OEW/油量/业载/油耗/速度）与油量政策（绕飞比例、最终储备、滑行油）。
+### 🛫 航线规划
+
+1. 下拉选择**出发 / 到达 / 备降**机场（内置 11 个样本机场，国内 8 个；接入完整 OurAirports 数据集的方法见[数据来源](docs/data-sources.md)）；
+2. 地图即时画出大圆航线（红色实线）与备降航段（橙色虚线），悬停机场标记可看标高；
+3. 下方给出航距（km/NM）、航程时间、轮档油、本航段可带业载与可行性判定，以及轮档油构成的条形图与明细表。
+
+![航线规划页](docs/img/app-route-tab.png)
+
+### 📊 业载-航程
+
+- 拖动**储备油扣减**滑块，整组包线左移——直观体会"手册航程是含储备的"；
+- 勾选对比机型（A320neo / 737 MAX 8 / C919 估计值），与"当前自定义机型"同图对比，悬停曲线读任意业载点的最大航程。
+
+![业载-航程页](docs/img/app-envelope-tab.png)
+
+### 🌡️ 高原高温
+
+- 勾选机场（默认浦东 / 乌鲁木齐 / 喀什 / 昆明），为每个机场设定假设温度；
+- 表格与柱状图输出：需要场长 vs 可用跑道的**余量**，以及"热到几度顶满跑道"的**临界温度**。
+
+![高原高温页](docs/img/app-hothigh-tab.png)
+
+### 侧栏参数说明
+
+| 参数 | 含义 | 默认 |
+|---|---|---|
+| 机型参数 | MTOW / OEW / 最大油量 / 最大业载 / 巡航油耗 / 巡航 TAS | A320neo 级代理 |
+| 业载 | 当前航段假设业载 | 15 t |
+| 巡航顶风 | 平均巡航风分量，负值为顺风 | 0 km/h |
+| 绕飞比例 | 占航程油的百分比 | 5% |
+| 最终储备 | 30 min（ICAO 惯例）或 45 min（CCAR-121 国内惯例） | 30 min |
+| 滑行油 | 固定滑行 allowance | 200 kg |
+
+Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两边数字永远一致。
 
 （可选）研究级性能模型：`pip install -e ".[perf]"` 安装 OpenAP 后端（规划中，见路线图）。
 
@@ -84,6 +120,7 @@ streamlit run app.py
 
 - [x] v0.1 仓库骨架：CLI + 大圆 + 机场数据 + 性能/油量内核 + CI
 - [x] v0.2 业载-航程案例 notebook + 高原高温案例 notebook
+- [x] Streamlit Web 界面（`app.py`：地图航线规划 / 交互包线 / 高原高温）
 - [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
 - [ ] OpenAP 研究级性能后端封装（可选 extra，规划中）
 - [ ] v0.3 OpenSky 延误传播网络分析（`network.py` + 案例 03）
@@ -91,11 +128,11 @@ streamlit run app.py
 
 ## English
 
-**c919-routelab** is an open-source, learning-grade toolkit for route-level operations analysis of single-aisle airliners, built entirely on public data (OurAirports airports and runways, public aircraft specifications, later OpenSky ADS-B). Given an origin–destination pair it estimates great-circle distance, a payload–range envelope, heuristic takeoff field lengths with altitude/temperature corrections, and a simplified CCAR-121-style fuel breakdown (taxi, trip, 5% contingency, alternate, final reserve). The C919 has no open performance data, so a clearly documented A320neo-class proxy aircraft is used; an optional `openap` extra is planned to swap in a research-grade model. Everything here is for education only — not for flight planning or engineering. See `docs/` for methodology and data sources.
+**c919-routelab** is an open-source, learning-grade toolkit for route-level operations analysis of single-aisle airliners, built entirely on public data (OurAirports airports and runways, public aircraft specifications, later OpenSky ADS-B). Given an origin–destination pair it estimates great-circle distance, a payload–range envelope, heuristic takeoff field lengths with altitude/temperature corrections, and a simplified CCAR-121-style fuel breakdown (taxi, trip, 5% contingency, alternate, final reserve). The C919 has no open performance data, so a clearly documented A320neo-class proxy aircraft is used; an optional `openap` extra is planned to swap in a research-grade model. An optional Streamlit web app (`pip install -e ".[app]"` then `streamlit run app.py`) puts the same computation layer behind a GUI: a map-based route planner with great-circle drawing, an interactive payload-range chart with aircraft comparison, and hot-and-high field-length margins. Everything here is for education only — not for flight planning or engineering. See `docs/` for methodology and data sources.
 
 ## Français
 
-**c919-routelab** est une boîte à outils open source et pédagogique pour l'analyse opérationnelle des avions monocoulois, construite entièrement à partir de données publiques. Pour une paire origine–destination donnée, elle estime la distance orthodromique, l'enveloppe charge utile–distance, des longueurs de piste corrigées de l'altitude et de la température, ainsi qu'une décomposition simplifiée du carburant (roulage, trajet, contingence de 5 %, aérodrome de dégagement, réserve finale). En l'absence de données de performance ouvertes sur le C919, un appareil proxy de classe A320neo est utilisé et documenté. Réservé à l'apprentissage — pas pour le vol réel.
+**c919-routelab** est une boîte à outils open source et pédagogique pour l'analyse opérationnelle des avions monocoulois, construite entièrement à partir de données publiques. Pour une paire origine–destination donnée, elle estime la distance orthodromique, l'enveloppe charge utile–distance, des longueurs de piste corrigées de l'altitude et de la température, ainsi qu'une décomposition simplifiée du carburant (roulage, trajet, contingence de 5 %, aérodrome de dégagement, réserve finale). En l'absence de données de performance ouvertes sur le C919, un appareil proxy de classe A320neo est utilisé et documenté. Une application web Streamlit optionnelle (`pip install -e ".[app]"` puis `streamlit run app.py`) propose la même couche de calcul en interface graphique : planification de routes sur carte, enveloppe charge–distance interactive et marges de longueur de piste en conditions chaudes et hautes. Réservé à l'apprentissage — pas pour le vol réel.
 
 ## License
 
