@@ -39,16 +39,27 @@ def route_range(
     alternate: str = typer.Option("", help="Alternate airport code for the reserve computation."),
     payload: float = typer.Option(15_000.0, help="Payload assumed on board, kg."),
     headwind: float = typer.Option(0.0, help="Average cruise headwind, km/h."),
+    backend: str = typer.Option(
+        "simple", help="Burn model: 'simple' (constant flow) or 'openap' (research-grade)."
+    ),
+    actype: str = typer.Option(
+        "a320", help="Aircraft type for the OpenAP backend (e.g. a320, b738)."
+    ),
 ) -> None:
     """Estimated trip time and simplified block fuel for one route (proxy aircraft)."""
     db = AirportDB()
-    plan = plan_leg(db, _PROXY, origin, destination, alternate, payload, headwind, _POLICY)
+    plan = plan_leg(
+        db, _PROXY, origin, destination, alternate, payload, headwind, _POLICY,
+        backend=backend, actype=actype if backend == "openap" else None,
+    )
     b = plan.fuel
     feasible = plan.feasible
+    backend_note = plan.backend if plan.backend == "simple" else f"openap ({plan.actype})"
     lines = [
         f"Route        {plan.route.origin} -> {plan.route.destination}  "
         f"{plan.route.distance_km:.0f} km",
         f"Aircraft     {_PROXY.name}",
+        f"Backend      {backend_note}",
         f"Trip time    {plan.trip_time_h:.2f} h",
         f"Trip fuel    {b.trip_kg:.0f} kg",
         f"Contingency  {b.contingency_kg:.0f} kg (5%)",

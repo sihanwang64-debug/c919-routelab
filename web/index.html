@@ -6,7 +6,7 @@
 <title>c919-routelab · 航线运行分析台</title>
 <script src="vendor/plotly.min.js"></script>
 <script>window.Plotly || document.write('<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"><\/script>');</script>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <header>
@@ -24,6 +24,23 @@
 
 <div class="wrap">
   <aside>
+    <section class="sgroup">
+      <h2>性能模型</h2>
+      <div class="field"><label>燃烧模型</label>
+        <select id="p-backend">
+          <option value="simple">简化 · 常数巡航油耗</option>
+          <option value="openap">OpenAP · 研究级（随重量变化）</option>
+        </select>
+      </div>
+      <div class="field" id="actype-field" style="display:none">
+        <label>机型（OpenAP 数据库）</label><select id="p-actype"></select>
+      </div>
+      <p class="note" id="backend-note" style="display:none">
+        OpenAP 模式：MTOW / OEW 取自 OpenAP 机型数据库，巡航油耗与速度由模型给出
+        （侧栏对应项停用）；油箱容量与最大业载仍可调。C919 无公开模型，用 a320 作同级别代理。
+      </p>
+    </section>
+
     <section class="sgroup">
       <h2>机型参数</h2>
       <div class="field"><label>MTOW（t）</label><input type="number" id="p-mtow" value="79.0" step="0.5" min="60" max="100"></div>
@@ -72,6 +89,7 @@
       <button id="tab-env" onclick="showTab('env')">业载–航程</button>
       <button id="tab-hot" onclick="showTab('hot')">高原高温</button>
     </div>
+    <div id="api-error"></div>
 
     <div id="page-route">
       <div class="cols" style="margin-bottom:14px">
@@ -107,6 +125,6 @@
   <span>参数 · 公开手册量级与公开报道估计</span>
   <span><a href="https://github.com/sihanwang64-debug/c919-routelab" target="_blank" rel="noopener">GitHub 仓库</a></span>
 </footer>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

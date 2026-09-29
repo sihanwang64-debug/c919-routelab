@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -98,12 +99,16 @@ class RouteRequest(BaseModel):
     headwind_kmh: float = 0.0
     aircraft: AircraftIn = AircraftIn()
     policy: PolicyIn = PolicyIn()
+    backend: Literal["simple", "openap"] = "simple"
+    actype: str | None = None
 
 
 class EnvelopeRequest(BaseModel):
     aircraft: AircraftIn = AircraftIn()
     reserve_kg: float = Field(default=0.0, ge=0)
     step_kg: float = Field(default=100.0, gt=0)
+    backend: Literal["simple", "openap"] = "simple"
+    actype: str | None = None
 
 
 class HotAirportIn(BaseModel):
@@ -148,6 +153,38 @@ def list_presets() -> dict[str, dict]:
     return {name: asdict(ac) for name, ac in PRESET_AIRCRAFT.items()}
 
 
+@app.get("/api/aircraft-types")
+def list_aircraft_types() -> list[str]:
+    """Aircraft type codes supported by the OpenAP backend (503 if not installed)."""
+    try:
+        from routelab.openap_backend import supported_aircraft
+
+        return supported_aircraft()
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _backend_kwargs(req: RouteRequest | EnvelopeRequest) -> dict:
+    """Common backend plumbing with friendly error mapping."""
+    kwargs: dict = {"backend": req.backend}
+    if req.backend == "openap":
+        try:
+            from routelab import openap_backend as ob
+
+            if req.actype:
+                supported = ob.supported_aircraft()
+                if req.actype.lower() not in supported:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"aircraft type {req.actype!r} not in OpenAP; "
+                        f"try e.g. 'a320', 'b738' (GET /api/aircraft-types)",
+                    )
+            kwargs["actype"] = req.actype
+        except ImportError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return kwargs
+
+
 @app.post("/api/route")
 def plan_route(req: RouteRequest) -> dict:
     """Plan one leg: distance, block fuel breakdown, feasibility."""
@@ -161,9 +198,14 @@ def plan_route(req: RouteRequest) -> dict:
             req.payload_kg,
             req.headwind_kmh,
             req.policy.to_policy(),
+            **_backend_kwargs(req),
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {
         "origin": plan.route.origin,
         "destination": plan.route.destination,
@@ -182,18 +224,45 @@ def plan_route(req: RouteRequest) -> dict:
         "fuel_limit_kg": plan.fuel_limit_kg,
         "feasible": plan.feasible,
         "max_payload_on_leg_kg": plan.max_payload_on_leg_kg,
+        "backend": plan.backend,
+        "actype": plan.actype,
     }
 
 
 @app.post("/api/envelope")
 def envelope(req: EnvelopeRequest) -> dict:
     """Payload-range envelope points for one aircraft."""
-    df = payload_range_table(
-        req.aircraft.to_proxy(), step_kg=req.step_kg, reserve_kg=req.reserve_kg
-    )
+    try:
+        if req.backend == "openap":
+            from routelab.openap_backend import payload_range_table_openap
+
+            if not req.actype:
+                raise HTTPException(
+                    status_code=400, detail="backend 'openap' needs 'actype'"
+                )
+            rows = payload_range_table_openap(
+                req.actype,
+                max_payload_kg=req.aircraft.max_payload_kg,
+                tank_capacity_kg=req.aircraft.max_fuel_kg,
+                step_kg=max(req.step_kg, 250.0),
+                reserve_kg=req.reserve_kg,
+            )
+            return {
+                "payload_kg": [r["payload_kg"] for r in rows],
+                "max_range_km": [round(r["max_range_km"], 1) for r in rows],
+                "backend": "openap",
+                "actype": req.actype.lower(),
+            }
+        df = payload_range_table(
+            req.aircraft.to_proxy(), step_kg=req.step_kg, reserve_kg=req.reserve_kg
+        )
+    except (ValueError, ImportError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "payload_kg": df["payload_kg"].tolist(),
         "max_range_km": df["max_range_km"].round(1).tolist(),
+        "backend": "simple",
+        "actype": None,
     }
 
 

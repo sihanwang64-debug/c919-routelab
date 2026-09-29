@@ -24,7 +24,7 @@
 
 - 🌍 大圆航距与初始航向（球面近似，误差约 0.5% 量级，见[方法学](docs/methodology.md)）
 - 🛫 机场与跑道数据层（内置 [OurAirports](https://ourairports.com/data/) 公有领域数据样本，可通过环境变量切换完整数据集）
-- ✈️ 同级代理机型性能模型（用公开资料的 A320neo 级参数近似 C919，诚实标注，后续可切换 [OpenAP](https://github.com/junzis/openap)）
+- ✈️ 两级性能模型：简化常数油耗（默认）+ 可选 [OpenAP](https://github.com/junzis/openap) 研究级燃烧模型（油耗随重量变化，`pip install -e ".[perf]"`）
 - 📊 业载-航程包线（payload–range envelope）
 - ⛽ 简化油量政策，逐项输出 breakdown
 - 🖥️ Web 界面（前后端分离：FastAPI 后端 `server.py` + 原生 HTML/JS 前端 `web/`，双击 `start_webapp.bat` 即用）/ Streamlit 版 / CLI，计算层同源、数字一致
@@ -114,7 +114,7 @@ src/routelab/（计算内核：airports / performance / fuel / planning / preset
 
 Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两边数字永远一致。仓库里另有等价的 Streamlit 版（`app.py`，`pip install -e ".[app]"` 后 `streamlit run app.py`）。
 
-（可选）研究级性能模型：`pip install -e ".[perf]"` 安装 OpenAP 后端（规划中，见路线图）。
+（可选）研究级性能模型：`pip install -e ".[perf]"` 安装 OpenAP，然后在界面左上「性能模型」切换为 OpenAP 模式（机型下拉选 a320/b738 等 37 个型号）。
 
 ## 案例集（cases/）
 
@@ -128,7 +128,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 ## 方法学与诚实话
 
 - C919 没有公开性能数据，本仓库用**同级别代理机型**（约 170 座、LEAP-1 级发动机的 A320neo 级参数）做近似，所有参数与假设在 [docs/methodology.md](docs/methodology.md) 中逐条列明；
-- 球面地球大圆近似（~0.5% 误差）；巡航油耗视为常数；起降场长是启发式公式，系数全部写在代码里；
+- 简化模式下巡航油耗视为常数；切换 OpenAP 模式后油耗随重量变化（见方法学 1b 节）；起降场长是启发式公式，系数全部写在代码里；
 - 油量政策参考 CCAR-121 / ICAO Annex 6 的结构做了大幅简化，**不保守、不权威**；
 - 数据来源全部公开，见 [docs/data-sources.md](docs/data-sources.md)。
 
@@ -139,7 +139,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 - [x] 前后端分离 Web 版：FastAPI API（`server.py`）+ 原生前端（`web/`），`start_webapp.bat` 一键启动
 - [x] Streamlit Web 界面（`app.py`：地图航线规划 / 交互包线 / 高原高温）
 - [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
-- [ ] OpenAP 研究级性能后端封装（可选 extra，规划中）
+- [x] OpenAP 研究级燃烧模型后端（`routelab/openap_backend.py`，CLI/API/界面均可切换）
 - [ ] v0.3 OpenSky 延误传播网络分析（`network.py` + 案例 03）
 - [ ] v1.0 机队情景案例 + 打 tag
 

@@ -6,7 +6,7 @@ const $ = (id) => document.getElementById(id);
 const fmt = (v, d = 0) =>
   v == null ? "--" : v.toLocaleString("zh-CN", { maximumFractionDigits: d });
 
-const state = { airports: [], presets: {} };
+const state = { airports: [], presets: {}, aircraftTypes: [] };
 
 // ------------------------------------------------------- chart theme
 
@@ -61,12 +61,31 @@ function policyPayload() {
   };
 }
 
+const backend = () => $("p-backend").value;
+const actype = () => $("p-actype").value;
+
 async function api(path, body) {
   const res = await fetch(path, body
     ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     : undefined);
-  if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    let msg;
+    try { msg = (await res.json()).detail || res.statusText; } catch { msg = res.statusText; }
+    const err = new Error(`${msg}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
+}
+
+function showApiError(err) {
+  const el = $("api-error");
+  if (!el) console.error(err);
+  else el.innerHTML = `<p class="bad">请求失败：${err.message}</p>`;
+}
+function clearApiError() {
+  const el = $("api-error");
+  if (el) el.innerHTML = "";
 }
 
 // great-circle arc for the map (geometry only, drawn client-side)
@@ -113,13 +132,21 @@ async function renderRoute() {
   const o = state.airports.find((a) => a.ident === $("origin").value);
   const d = state.airports.find((a) => a.ident === $("dest").value);
   const altV = $("altn").value;
-  const plan = await api("/api/route", {
-    origin: o.ident, destination: d.ident,
-    alternate: altV !== "-" ? altV : "",
-    payload_kg: +$("p-payload").value * 1000,
-    headwind_kmh: +$("p-wind").value,
-    aircraft: aircraftPayload(), policy: policyPayload(),
-  });
+  let plan;
+  try {
+    plan = await api("/api/route", {
+      origin: o.ident, destination: d.ident,
+      alternate: altV !== "-" ? altV : "",
+      payload_kg: +$("p-payload").value * 1000,
+      headwind_kmh: +$("p-wind").value,
+      aircraft: aircraftPayload(), policy: policyPayload(),
+      backend: backend(), actype: backend() === "openap" ? actype() : null,
+    });
+    clearApiError();
+  } catch (err) {
+    showApiError(err);
+    return;
+  }
   const alt = altV !== "-" ? state.airports.find((a) => a.ident === altV) : null;
 
   $("route-metrics").innerHTML = `
@@ -196,26 +223,47 @@ async function renderRoute() {
 async function renderEnv() {
   if (!window.Plotly) return;
   const reserve = +$("p-reserve").value * 1000;
-  const jobs = [];
-  if ($("c-custom").checked) jobs.push(["当前机型", aircraftPayload(), THEME.crimson, 2.4]);
-  const presetDefs = [
-    ["c-a320", "A320neo (公开手册量级)", "A320neo", THEME.accent, 1.7],
-    ["c-max8", "737 MAX 8 (公开手册量级)", "737 MAX 8", THEME.sage, 1.7],
-    ["c-c919", "C919 (公开报道+估计，非官方)", "C919（估计）", THEME.ochre, 1.7],
-  ];
-  for (const [id, key, short, color, width] of presetDefs)
-    if ($(id).checked && state.presets[key]) jobs.push([short, state.presets[key], color, width]);
-  const results = await Promise.all(
-    jobs.map(async ([label, aircraft, color, width]) => ({
-      label, color, width,
-      env: await api("/api/envelope", { aircraft, reserve_kg: reserve }),
-    }))
-  );
-  const traces = results.map(({ label, color, width, env }) => ({
-    x: env.payload_kg.map((p) => p / 1000), y: env.max_range_km.map((r) => r / 1000),
-    mode: "lines", name: label, line: { color, width },
-    hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + label + "</extra>",
-  }));
+  let traces;
+  if (backend() === "openap") {
+    let env;
+    try {
+      env = await api("/api/envelope", {
+        aircraft: aircraftPayload(), reserve_kg: reserve,
+        backend: "openap", actype: actype(),
+      });
+      clearApiError();
+    } catch (err) { showApiError(err); return; }
+    traces = [{
+      x: env.payload_kg.map((p) => p / 1000), y: env.max_range_km.map((r) => r / 1000),
+      mode: "lines", name: `${env.actype}（OpenAP）`, line: { color: THEME.accent, width: 2.2 },
+      hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + env.actype + " (OpenAP)</extra>",
+    }];
+  } else {
+    const jobs = [];
+    if ($("c-custom").checked) jobs.push(["当前机型", aircraftPayload(), THEME.crimson, 2.4]);
+    const presetDefs = [
+      ["c-a320", "A320neo (公开手册量级)", "A320neo", THEME.accent, 1.7],
+      ["c-max8", "737 MAX 8 (公开手册量级)", "737 MAX 8", THEME.sage, 1.7],
+      ["c-c919", "C919 (公开报道+估计，非官方)", "C919（估计）", THEME.ochre, 1.7],
+    ];
+    for (const [id, key, short, color, width] of presetDefs)
+      if ($(id).checked && state.presets[key]) jobs.push([short, state.presets[key], color, width]);
+    let results;
+    try {
+      results = await Promise.all(
+        jobs.map(async ([label, aircraft, color, width]) => ({
+          label, color, width,
+          env: await api("/api/envelope", { aircraft, reserve_kg: reserve }),
+        }))
+      );
+      clearApiError();
+    } catch (err) { showApiError(err); return; }
+    traces = results.map(({ label, color, width, env }) => ({
+      x: env.payload_kg.map((p) => p / 1000), y: env.max_range_km.map((r) => r / 1000),
+      mode: "lines", name: label, line: { color, width },
+      hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + label + "</extra>",
+    }));
+  }
   Plotly.react("env-chart", traces, chartLayout({
     title: { text: "业载–航程包线（含储备油）", font: TITLE_FONT, x: 0, xanchor: "left" },
     height: 470,
@@ -287,11 +335,47 @@ function scheduleRender() {
   timer = setTimeout(() => renderActive(), 250);
 }
 
+// OpenAP mode: MTOW/OEW/burn/TAS come from the OpenAP database, so the
+// corresponding sidebar inputs stop applying; tank/payload caps stay live.
+function applyBackendMode() {
+  const openapMode = backend() === "openap";
+  $("actype-field").style.display = openapMode ? "" : "none";
+  $("backend-note").style.display = openapMode ? "" : "none";
+  for (const id of ["p-mtow", "p-oew", "p-flow", "p-tas"]) $(id).disabled = openapMode;
+  for (const id of ["c-a320", "c-max8", "c-c919"]) {
+    $(id).disabled = openapMode;
+    if (openapMode) $(id).checked = false;
+  }
+  $("c-custom").disabled = openapMode;
+  $("c-custom").checked = !openapMode ? $("c-custom").checked : true;
+}
+
 (async function init() {
   if (!window.Plotly) $("plot-error").style.display = "block";
-  const [airports, presets] = await Promise.all([api("/api/airports"), api("/api/presets")]);
-  state.airports = airports.map(normalizeAirport);
-  state.presets = presets;
+  try {
+    const [airports, presets, aircraftTypes] = await Promise.all([
+      api("/api/airports"), api("/api/presets"), api("/api/aircraft-types"),
+    ]);
+    state.airports = airports.map(normalizeAirport);
+    state.presets = presets;
+    state.aircraftTypes = aircraftTypes;
+  } catch (err) {
+    // aircraft-types 503 = openap not installed: degrade gracefully
+    try {
+      const [airports, presets] = await Promise.all([api("/api/airports"), api("/api/presets")]);
+      state.airports = airports.map(normalizeAirport);
+      state.presets = presets;
+    } catch (e2) { showApiError(e2); }
+  }
+  if (state.aircraftTypes.length) {
+    $("p-actype").innerHTML = state.aircraftTypes
+      .map((t) => `<option value="${t}">${t.toUpperCase()}</option>`).join("");
+    $("p-actype").value = "a320";
+  } else {
+    $("p-backend").querySelector('option[value="openap"]').disabled = true;
+  }
+  $("p-backend").addEventListener("change", () => { applyBackendMode(); scheduleRender(); });
+  applyBackendMode();
   fillSelects(); fillHotTemps();
   document.querySelectorAll("input,select").forEach((el) => {
     el.addEventListener("input", scheduleRender);

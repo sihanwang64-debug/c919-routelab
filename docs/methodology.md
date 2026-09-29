@@ -16,7 +16,16 @@ COMAC does not publish open performance data for the C919. We therefore model an
 | Cruise fuel flow | 2 300 kg/h | order-of-magnitude, constant |
 | Climb+descent allowance | 0.2 h | fixed |
 
-Integrating the research-grade [OpenAP](https://github.com/junzis/openap) A320neo model as an optional backend is planned for v0.2; the proxy stays as the dependency-free default.
+### 1b. Optional OpenAP backend (research-grade burn)
+
+When the optional [OpenAP](https://github.com/junzis/openap) package is installed (`pip install -e ".[perf]"`), `backend="openap"` replaces the constant-flow assumption with OpenAP's published `FuelFlow` model, integrated over the cruise at 60 s steps (`d·m/dt = −FF(m)`), so the burn depends on instantaneous mass. Differences from the simple backend:
+
+- MTOW and OEW come from OpenAP's aircraft database (e.g. `a320`: 78 000 / 42 600 kg); tank capacity and payload cap remain the editable presets;
+- the diversion leg is flown at the *post-trip* mass and the final reserve hold is evaluated at the *post-alternate* mass, instead of everything at cruise flow;
+- trip fuel is solved by fixed-point iteration (4 passes converge far below a kilogram) because the burn depends on the mass that includes the burn itself;
+- C919 has no model in OpenAP — `a320` remains the same-class proxy. Check-in sizes of the model are visible in cases/01: OpenAP trip fuel on a 3 300 km stage runs roughly 10–15 % above the constant-flow figure.
+
+The constant-flow proxy stays the dependency-free default (`backend="simple"`).
 
 ## 2. Great-circle geometry
 

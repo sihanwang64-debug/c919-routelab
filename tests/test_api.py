@@ -80,3 +80,57 @@ def test_frontend_index_served() -> None:
     res = client.get("/")
     assert res.status_code == 200
     assert "航线运行分析台" in res.text
+
+
+def test_aircraft_types_endpoint() -> None:
+    res = client.get("/api/aircraft-types")
+    assert res.status_code == 200
+    assert "a320" in res.json()
+
+
+def test_route_endpoint_openap_backend() -> None:
+    res = client.post("/api/route", json={
+        "origin": "ZSPD", "destination": "ZWWW", "alternate": "ZWSH",
+        "payload_kg": 15_000, "backend": "openap", "actype": "a320",
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["backend"] == "openap" and body["actype"] == "a320"
+    plan = plan_leg(AirportDB(), ProxyAircraft(), "ZSPD", "ZWWW", "ZWSH",
+                    15_000, backend="openap", actype="a320")
+    assert body["block_kg"] == pytest.approx(plan.fuel.block_kg)
+    assert body["feasible"] is plan.feasible
+
+
+def test_route_endpoint_openap_unknown_actype_is_404() -> None:
+    res = client.post("/api/route", json={
+        "origin": "ZSPD", "destination": "ZWWW",
+        "backend": "openap", "actype": "c919",
+    })
+    assert res.status_code == 404
+
+
+def test_route_endpoint_openap_requires_actype() -> None:
+    res = client.post("/api/route", json={
+        "origin": "ZSPD", "destination": "ZWWW", "backend": "openap",
+    })
+    assert res.status_code == 400
+
+
+def test_route_endpoint_rejects_unknown_backend() -> None:
+    res = client.post("/api/route", json={
+        "origin": "ZSPD", "destination": "ZWWW", "backend": "magic",
+    })
+    assert res.status_code == 422  # pydantic Literal validation
+
+
+def test_envelope_endpoint_openap_backend() -> None:
+    res = client.post("/api/envelope", json={
+        "reserve_kg": 2_500, "backend": "openap", "actype": "a320",
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["backend"] == "openap" and body["actype"] == "a320"
+    ranges = body["max_range_km"]
+    assert all(b >= a - 1e-6 for a, b in zip(ranges, ranges[1:]))
+    assert ranges[-1] > ranges[0]

@@ -202,6 +202,8 @@ td:last-child, th:last-child { padding-right: 2px; }
   border: 1px solid #e4cdcb;
   border-radius: 4px;
 }
+#api-error { margin: 0 0 12px; font-size: 13px; }
+#api-error:empty { display: none; }
 footer {
   display: flex;
   gap: 26px;
