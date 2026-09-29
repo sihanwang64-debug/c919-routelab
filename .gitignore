@@ -10,3 +10,6 @@ build/
 site/
 .ipynb_checkpoints/
 .DS_Store
+
+# local tooling (ZCode index config)
+.zcodeignore
