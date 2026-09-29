@@ -2,7 +2,7 @@
 
 Learning-grade narrow-body route operations analysis on public data.
 
-- 中文主页见仓库 [README](https://github.com/your-github-username/c919-routelab)。
+- 中文主页见仓库 [README](https://github.com/sihanwang64-debug/c919-routelab)。
 - [Methodology](methodology.md)：每个模型假设的来源与局限。
 - [Data sources](data-sources.md)：数据出处与许可。
 

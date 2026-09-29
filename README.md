@@ -6,11 +6,9 @@
 > An open-source, learning-grade toolkit for route-level narrow-body operations analysis, built entirely on public data (unofficial study project).
 > Une boîte à outils open source et pédagogique pour l'analyse opérationnelle des lignes aériennes, construite uniquement à partir de données publiques (projet d'étude non officiel).
 
-![CI](https://github.com/your-github-username/c919-routelab/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/sihanwang64-debug/c919-routelab/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-
-> 把上面徽章和下文中的 `your-github-username` 替换成你的 GitHub 用户名。
 
 **非官方声明**：本项目与中国商用飞机有限责任公司（COMAC）及其任何下属单位无任何隶属、合作或授权关系；"C919" 仅作为学习研究主题的名称使用，相关商标权利归其权利人所有。所有计算结果仅供学习演示，**不可用于飞行计划、工程或任何严肃用途**。详见 [DISCLAIMER.md](DISCLAIMER.md)。
 
@@ -35,7 +33,7 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/your-github-username/c919-routelab.git
+git clone https://github.com/sihanwang64-debug/c919-routelab.git
 cd c919-routelab
 pip install -e .
 
