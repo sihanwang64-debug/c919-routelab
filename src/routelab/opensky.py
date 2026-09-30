@@ -17,26 +17,72 @@ Honest approximations, documented because they matter:
   time minus that route median. Routes with fewer than
   ``min_route_samples`` observations are dropped (median too noisy).
 
-The endpoint is anonymous-rate-limited; :func:`fetch_arrivals` retries
-with exponential backoff and alternating direct/proxy paths (this machine
-often needs ``http://127.0.0.1:10808`` to reach github-grade targets).
+Access policy (verified 2026-09): **the anonymous tier is effectively
+unusable for this purpose** -- history older than ~24 h returns 403, and
+even a last-24-h window returns almost no rows (measured: 1 arrival and
+51 departures for EDDF, a densely-covered hub). Real data requires "You cannot access
+historical flights". Registered users get OAuth2 client credentials
+(client id + secret from the OpenSky profile page, 400 credits/day) which
+unlock history -- pass them via ``client_id``/``client_secret`` or the
+``OPENSKY_CLIENT_ID`` / ``OPENSKY_CLIENT_SECRET`` environment variables;
+tokens are fetched once and cached until shortly before expiry. A 403
+fails immediately with an actionable message instead of being retried
+(retrying a policy refusal cannot help); only connection errors and 5xx
+are retried, over alternating direct/proxy paths with a short backoff
+(this machine often needs ``http://127.0.0.1:10808`` to reach blocked
+targets).
 """
 
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
 import pandas as pd
 
 ARRIVALS_URL = "https://opensky-network.org/api/flights/arrival"
+TOKEN_URL = (
+    "https://auth.opensky-network.org/auth/realms/opensky-network/"
+    "protocol/openid-connect/token"
+)
 DEFAULT_PROXY = "http://127.0.0.1:10808"  # local v2rayN mixed port on this machine
 DEFAULT_CACHE_DIR = Path("data_cache") / "opensky"
+
+_TOKEN_CACHE: dict[str, tuple[str, float]] = {}  # client_id -> (token, expires_at)
 
 
 def _cache_path(cache_dir: Path, airport: str, begin: int, end: int) -> Path:
     return cache_dir / f"arrivals_{airport}_{begin}_{end}.json"
+
+
+def _bearer_token(
+    client_id: str | None, client_secret: str | None, proxy: str | None
+) -> dict[str, str]:
+    """OAuth2 client-credentials token, cached until ~60 s before expiry."""
+    import httpx  # lazy: only the importer needs it
+
+    if not (client_id and client_secret):
+        return {}
+    cached = _TOKEN_CACHE.get(client_id)
+    if cached and cached[1] > time.time():
+        return {"Authorization": f"Bearer {cached[0]}"}
+    with httpx.Client(timeout=20.0, proxy=proxy, trust_env=False) as client:
+        res = client.post(
+            TOKEN_URL,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            },
+        )
+        res.raise_for_status()
+        payload = res.json()
+    token = payload["access_token"]
+    expires_in = float(payload.get("expires_in", 1_700))
+    _TOKEN_CACHE[client_id] = (token, time.time() + expires_in - 60)
+    return {"Authorization": f"Bearer {token}"}
 
 
 def fetch_arrivals(
@@ -46,18 +92,25 @@ def fetch_arrivals(
     *,
     cache_dir: Path | str | None = DEFAULT_CACHE_DIR,
     proxy: str | None = DEFAULT_PROXY,
-    timeout_s: float = 30.0,
-    max_attempts: int = 6,
+    timeout_s: float = 20.0,
+    max_attempts: int = 3,
+    client_id: str | None = None,
+    client_secret: str | None = None,
 ) -> list[dict]:
     """Arrivals JSON rows for ``airport`` between unix seconds begin/end.
 
     Cached on first success (replaying the cache never touches the
-    network). Retries alternate between the direct path and ``proxy`` with
-    exponential backoff; raises RuntimeError after ``max_attempts``.
+    network). A 403 fails immediately with the registration hint -- OpenSky
+    only serves the last ~24 h anonymously, so retrying cannot help. A 404
+    is a valid "no arrivals recorded in this window" answer (empty list).
+    Connection errors and 5xx are retried over alternating direct/proxy
+    paths.
     """
     import httpx  # lazy: only the importer needs it
 
     airport = airport.upper()
+    client_id = client_id or os.environ.get("OPENSKY_CLIENT_ID")
+    client_secret = client_secret or os.environ.get("OPENSKY_CLIENT_SECRET")
     cache_file = None
     if cache_dir is not None:
         cache_dir = Path(cache_dir)
@@ -70,22 +123,37 @@ def fetch_arrivals(
     for attempt in range(max_attempts):
         use_proxy = paths[attempt % len(paths)]
         try:
+            headers = _bearer_token(client_id, client_secret, use_proxy)
             with httpx.Client(
                 timeout=timeout_s, proxy=use_proxy, trust_env=False
             ) as client:
                 res = client.get(
                     ARRIVALS_URL,
                     params={"airport": airport, "begin": begin, "end": end},
+                    headers=headers,
                 )
-                res.raise_for_status()
-                rows = res.json()
+            if res.status_code == 403:
+                raise RuntimeError(
+                    "OpenSky 拒绝访问（403）：匿名账号只能读取最近约 24 小时的到达数据。"
+                    "免费注册 opensky-network.org 后，在网站首页 Profile 页创建 "
+                    "OAuth2 Client ID / Secret 并填入上方输入框，即可访问历史数据"
+                    "（400 次/天）。"
+                )
+            if res.status_code == 404:
+                return []  # valid: no arrivals recorded in this window
+            res.raise_for_status()
+            rows = res.json()
+        except RuntimeError:
+            raise  # actionable policy errors must not be retried or wrapped
         except Exception as exc:  # noqa: BLE001 - network or HTTP errors
             last_error = exc
-            time.sleep(min(2**attempt, 20))
+            if attempt < max_attempts - 1:
+                time.sleep(min(2**attempt, 4))
             continue
         if not isinstance(rows, list):
             last_error = RuntimeError(f"unexpected payload: {rows!r:.120}")
-            time.sleep(min(2**attempt, 20))
+            if attempt < max_attempts - 1:
+                time.sleep(min(2**attempt, 4))
             continue
         if cache_file is not None:
             cache_dir.mkdir(parents=True, exist_ok=True)

@@ -367,7 +367,8 @@ async function runDelayAnalysis() {
   const source = $("d-source").value;
   const body = source === "opensky"
     ? { source, opensky_airport: $("d-os-airport").value.trim().toUpperCase(),
-        opensky_days: 3 }
+        opensky_client_id: $("d-os-id").value.trim(),
+        opensky_client_secret: $("d-os-secret").value }
     : { source, n_aircraft: +$("d-aircraft").value, n_days: +$("d-days").value, seed: 42 };
   const btn = $("d-run");
   btn.disabled = true; btn.textContent = "分析中…";
@@ -444,6 +445,8 @@ function applyDelaySourceMode() {
   $("d-synth-field").style.display = os ? "none" : "";
   $("d-synth-field2").style.display = os ? "none" : "";
   $("d-os-field").style.display = os ? "" : "none";
+  $("d-os-field2").style.display = os ? "" : "none";
+  $("d-os-field3").style.display = os ? "" : "none";
 }
 
 let timer = null;

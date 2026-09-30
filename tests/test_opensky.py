@@ -80,6 +80,8 @@ def test_fetch_arrivals_exhausts_retries_and_writes_cache_on_success(tmp_path) -
     calls = {"n": 0}
 
     class FakeResponse:
+        status_code = 200
+
         def raise_for_status(self) -> None:
             return None
 
@@ -96,7 +98,7 @@ def test_fetch_arrivals_exhausts_retries_and_writes_cache_on_success(tmp_path) -
         def __exit__(self, *exc) -> None:
             return None
 
-        def get(self, url, params=None):
+        def get(self, url, params=None, headers=None):
             calls["n"] += 1
             if calls["n"] < 3:
                 raise OSError("connection reset")
@@ -128,10 +130,122 @@ def test_fetch_arrivals_raises_after_all_attempts(tmp_path, monkeypatch) -> None
         def __exit__(self, *exc) -> None:
             return None
 
-        def get(self, url, params=None):
+        def get(self, url, params=None, headers=None):
             raise OSError("down")
 
     monkeypatch.setattr("httpx.Client", DeadClient)
     monkeypatch.setattr(opensky.time, "sleep", lambda s: None)  # speed up
     with pytest.raises(RuntimeError, match="failed after"):
         opensky.fetch_arrivals("ZSPD", 1, 2, cache_dir=tmp_path, max_attempts=2)
+
+
+def test_403_fails_fast_with_registration_hint(tmp_path) -> None:
+    calls = {"n": 0}
+
+    class ForbiddenClient:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> None:
+            return None
+
+        def get(self, url, params=None, headers=None):
+            calls["n"] += 1
+
+            class Res:
+                status_code = 403
+                text = "You cannot access historical flights"
+
+            return Res()
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr("httpx.Client", ForbiddenClient)
+    monkey.setattr(opensky.time, "sleep", lambda s: None)
+    try:
+        with pytest.raises(RuntimeError, match="免费注册"):
+            opensky.fetch_arrivals("ZSPD", 1, 2, cache_dir=tmp_path)
+    finally:
+        monkey.undo()
+    assert calls["n"] == 1  # policy refusal: never retried
+
+
+def test_404_is_a_valid_empty_window(tmp_path) -> None:
+    class EmptyClient:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> None:
+            return None
+
+        def get(self, url, params=None, headers=None):
+            class Res:
+                status_code = 404
+
+                def json(self):
+                    return []
+
+            return Res()
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr("httpx.Client", EmptyClient)
+    try:
+        rows = opensky.fetch_arrivals("ZSPD", 1, 2, cache_dir=tmp_path)
+    finally:
+        monkey.undo()
+    assert rows == []
+
+
+def test_client_credentials_attach_bearer_header(tmp_path) -> None:
+    seen = {}
+
+    class TokenClient:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> None:
+            return None
+
+        def post(self, url, data=None):
+            assert data["grant_type"] == "client_credentials"
+            return self._token_response()
+
+        def _token_response(self):
+            class Res:
+                status_code = 200
+
+                def raise_for_status(self):
+                    return None
+
+                def json(self):
+                    return {"access_token": "tok123", "expires_in": 1800}
+
+            return Res()
+
+        def get(self, url, params=None, headers=None):
+            seen["headers"] = headers
+
+            class Res:
+                status_code = 404  # empty window ends the flow
+
+            return Res()
+
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr("httpx.Client", TokenClient)
+    try:
+        rows = opensky.fetch_arrivals(
+            "ZSPD", 1, 2, cache_dir=tmp_path,
+            client_id="my-id", client_secret="my-secret",
+        )
+    finally:
+        monkey.undo()
+    assert rows == []
+    assert seen["headers"]["Authorization"] == "Bearer tok123"

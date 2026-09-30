@@ -319,7 +319,8 @@ class DelayRequest(BaseModel):
     n_days: int = Field(default=14, ge=3, le=60)
     seed: int = Field(default=42)
     opensky_airport: str = "ZSPD"
-    opensky_days: int = Field(default=3, ge=1, le=14)
+    opensky_client_id: str = ""
+    opensky_client_secret: str = ""
 
 
 def _airport_label(ident: str) -> str:
@@ -353,16 +354,23 @@ def delay_analysis(req: DelayRequest) -> dict:
             from routelab.opensky import arrivals_to_flights, fetch_arrivals
 
             end = int(_time.time()) - 6 * 3600  # feed lags ~5.5 h
-            begin = end - req.opensky_days * 86_400
+            if req.opensky_client_id and req.opensky_client_secret:
+                begin = end - 7 * 86_400  # registered tier: history unlocked
+            else:
+                begin = end - 18 * 3600  # anonymous tier: last ~24 h only
             raw = fetch_arrivals(
                 req.opensky_airport.upper(), begin, end,
                 cache_dir="data_cache/opensky",
+                client_id=req.opensky_client_id or None,
+                client_secret=req.opensky_client_secret or None,
             )
             flights = arrivals_to_flights(raw, min_route_samples=5)
             if len(flights) < 100:
                 raise ValueError(
-                    f"only {len(flights)} usable rows for "
-                    f"{req.opensky_airport.upper()} in this window"
+                    f"{req.opensky_airport.upper()} 在可访问时间窗内只有 "
+                    f"{len(flights)} 条可用记录。实测 OpenSky 匿名层几乎不返回数据"
+                    "（即使最近 24 小时）——免费注册后填入 Client ID/Secret 访问历史"
+                    "数据，或改用合成数据源。"
                 )
         except (ImportError, RuntimeError, ValueError) as exc:
             raise HTTPException(

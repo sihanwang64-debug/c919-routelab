@@ -138,6 +138,10 @@
           <input type="number" id="d-days" value="21" min="3" max="60" step="1"></div>
         <div class="field" id="d-os-field" style="display:none"><label>机场（ICAO）</label>
           <input type="text" id="d-os-airport" value="ZSPD" maxlength="4"></div>
+        <div class="field" id="d-os-field2" style="display:none"><label>Client ID（可选，访问历史数据）</label>
+          <input type="text" id="d-os-id" placeholder="注册后创建"></div>
+        <div class="field" id="d-os-field3" style="display:none"><label>Client Secret</label>
+          <input type="password" id="d-os-secret" placeholder="仅本机使用，不存储"></div>
         <div class="field" style="align-self:flex-end">
           <button id="d-run" onclick="runDelayAnalysis()">开始分析</button>
         </div>
@@ -150,7 +154,7 @@
       </div>
       <div class="card note-card" id="delay-note">方法：机尾号轮转链（过站 ≤ 180 分钟）上的延误继承——
         lift 明显大于 1 即传播信号；合成数据在生成时注入了传播机制，用于验证方法学（不是真实流量）；
-        OpenSky 模式用航线中位 block time 作伪时刻表、icao24 作机尾身份，匿名接口限流失败时自动提示回退。</div>
+        实测 OpenSky 匿名通道几乎不返回数据（历史 >24h 直接 403，最近窗口也只有个位数记录）——要拿真实数据：免费注册 opensky-network.org → Profile 页创建 Client ID/Secret → 填入上方输入框（400 次/天，仅本机使用）。没注册就用合成数据源，方法学等价。</div>
     </div>
   </main>
 </div>
@@ -160,6 +164,6 @@
   <span>参数 · 公开手册量级与公开报道估计</span>
   <span><a href="https://github.com/sihanwang64-debug/c919-routelab" target="_blank" rel="noopener">GitHub 仓库</a></span>
 </footer>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
