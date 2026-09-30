@@ -344,16 +344,106 @@ async function renderHot() {
 // ------------------------------------------------------------- wiring
 
 function showTab(name) {
-  for (const p of ["route", "env", "hot"]) $("page-" + p).style.display = p === name ? "" : "none";
-  for (const t of ["route", "env", "hot"]) $("tab-" + t).classList.toggle("active", t === name);
+  for (const p of ["route", "env", "hot", "delay"]) $("page-" + p).style.display = p === name ? "" : "none";
+  for (const t of ["route", "env", "hot", "delay"]) $("tab-" + t).classList.toggle("active", t === name);
   renderActive(name);
 }
 
 let currentTab = "route";
 function renderActive(name = currentTab) {
   currentTab = name;
-  const fn = name === "route" ? renderRoute : name === "env" ? renderEnv : renderHot;
+  const fn = name === "route" ? renderRoute
+    : name === "env" ? renderEnv
+    : name === "hot" ? renderHot
+    : renderDelay;
   fn().catch(console.error);
+}
+
+// ------------------------------------------------------------- tab 4
+
+let delayRan = false;
+
+async function runDelayAnalysis() {
+  const source = $("d-source").value;
+  const body = source === "opensky"
+    ? { source, opensky_airport: $("d-os-airport").value.trim().toUpperCase(),
+        opensky_days: 3 }
+    : { source, n_aircraft: +$("d-aircraft").value, n_days: +$("d-days").value, seed: 42 };
+  const btn = $("d-run");
+  btn.disabled = true; btn.textContent = "分析中…";
+  try {
+    const data = await api("/api/delay", body);
+    clearApiError();
+    renderDelayResults(data);
+  } catch (err) {
+    showApiError(err);
+  } finally {
+    btn.disabled = false; btn.textContent = "开始分析";
+  }
+}
+
+function renderDelayResults(data) {
+  const s = data.summary;
+  $("delay-metrics").innerHTML = `
+    <div class="metric"><div class="k">数据源</div><div class="v" style="font-size:15px">${data.source === "opensky" ? "OpenSky 实测" : "合成机队"}</div></div>
+    <div class="metric"><div class="k">航班</div><div class="v">${fmt(s.n_flights)}</div></div>
+    <div class="metric"><div class="k">机尾</div><div class="v">${fmt(s.n_tails)}</div></div>
+    <div class="metric"><div class="k">轮转链边</div><div class="v">${fmt(s.n_edges)}</div></div>
+    <div class="metric"><div class="k">平均到达延误</div><div class="v">${s.mean_delay_min}<span class="note">min</span></div></div>`;
+
+  $("delay-inheritance").innerHTML = `<table>
+    <tr><th>阈值</th><th>过站对</th><th>上一班延误</th><th>两班都延误</th>
+        <th>P(下一班延误)</th><th>P(下一班延误 | 上一班延误)</th><th>lift</th></tr>
+    ${data.inheritance.map((r) => `
+      <tr><td>${r.threshold_min} min</td><td>${fmt(r.n_pairs)}</td>
+      <td>${fmt(r.n_prev_delayed)}</td><td>${fmt(r.n_propagated)}</td>
+      <td>${r.p_next_delayed ?? "--"}</td><td>${r.p_next_given_prev ?? "--"}</td>
+      <td class="${(r.lift ?? 1) > 1.3 ? "bad" : ""}">${r.lift ?? "--"}</td></tr>`).join("")}
+  </table>`;
+
+  if (!window.Plotly) return;
+  const hubs = data.hubs;
+  if (hubs.length) {
+    Plotly.react("delay-hubs", [{
+      type: "bar", orientation: "h",
+      x: hubs.map((h) => h.propagation_ratio), y: hubs.map((h) => h.airport),
+      customdata: hubs.map((h) => h.label),
+      marker: { color: THEME.crimson },
+      text: hubs.map((h) => (h.propagation_ratio * 100).toFixed(0) + "%"),
+      textposition: "outside", textfont: { size: 11 }, cliponaxis: false,
+      hovertemplate: "%{customdata}<br>传播比例 %{x:.1%}<extra></extra>",
+    }], chartLayout({
+      title: { text: "传播枢纽：延误越过过站的占比", font: TITLE_FONT, x: 0, xanchor: "left" },
+      height: 360, margin: { l: 120, r: 40, t: 44, b: 30 },
+      xaxis: { tickformat: ".0%", zeroline: false }, yaxis: { autorange: "reversed", ticks: "" },
+    }), PLOTLY_CONFIG);
+  }
+
+  const flow = data.flow;
+  if (flow.length) {
+    Plotly.react("delay-flow", [
+      { type: "bar", name: "送出 sent", x: flow.map((f) => f.airport),
+        y: flow.map((f) => f.sent / 60), marker: { color: THEME.accent } },
+      { type: "bar", name: "接收 received", x: flow.map((f) => f.airport),
+        y: flow.map((f) => f.received / 60), marker: { color: THEME.slateLight } },
+    ], chartLayout({
+      title: { text: "机场延误流量（小时，按继承延误合计）", font: TITLE_FONT, x: 0, xanchor: "left" },
+      height: 360, barmode: "group", bargap: 0.3,
+      yaxis: { gridcolor: THEME.grid, zeroline: false },
+      legend: { orientation: "h", y: -0.22, x: 0 },
+    }), PLOTLY_CONFIG);
+  }
+}
+
+function renderDelay() {
+  if (!delayRan) { delayRan = true; runDelayAnalysis(); }
+}
+
+function applyDelaySourceMode() {
+  const os = $("d-source").value === "opensky";
+  $("d-synth-field").style.display = os ? "none" : "";
+  $("d-synth-field2").style.display = os ? "none" : "";
+  $("d-os-field").style.display = os ? "" : "none";
 }
 
 let timer = null;
@@ -407,7 +497,9 @@ function applyBackendMode() {
     $("p-backend").querySelector('option[value="openap"]').disabled = true;
   }
   $("p-backend").addEventListener("change", () => { applyBackendMode(); scheduleRender(); });
+  $("d-source").addEventListener("change", applyDelaySourceMode);
   applyBackendMode();
+  applyDelaySourceMode();
   fillSelects(); fillHotTemps(); fillOpenapCompare();
   document.querySelectorAll("input,select").forEach((el) => {
     el.addEventListener("input", scheduleRender);

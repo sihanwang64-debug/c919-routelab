@@ -136,7 +136,7 @@ src/routelab/（计算内核：airports / performance / fuel / planning / preset
 - 所有数字由 Python 包计算，前端零业务逻辑——CLI 与 Web 两个入口同源，数字永远一致
 - 后端加功能 = 在 `routelab` 包里写函数 + 在 `server.py` 暴露端点；前端只需调接口
 
-三个标签页的用法（左侧边栏为全局参数）：
+四个标签页的用法（左侧边栏为全局参数）：
 
 ### 航线规划
 
@@ -157,6 +157,12 @@ src/routelab/（计算内核：airports / performance / fuel / planning / preset
 
 - 为 8 个国内样本机场分别设定假设温度（默认七月午后情景）；
 - 表格与柱状图输出：需要场长 vs 可用跑道的**余量**，以及"热到几度顶满跑道"的**临界温度**。
+
+### 延误传播
+
+- 数据源二选一：**合成机队轮转**（150 架 × 21 天，方法学演示）或 **OpenSky 实测到达**（需联网，失败自动提示）；
+- 输出三件套：继承 **lift** 表（15/30/60 分钟阈值）、**传播枢纽**排名、机场延误**流量**（sent/received）；
+- 对应案例 03 与 `network.py`——方法学与近似逐条见[方法学](docs/methodology.md)第 8 节。
 
 ![高原高温页](docs/img/app-hothigh-tab.png)
 

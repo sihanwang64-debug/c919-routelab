@@ -92,6 +92,7 @@
       <button id="tab-route" class="active" onclick="showTab('route')">航线规划</button>
       <button id="tab-env" onclick="showTab('env')">业载–航程</button>
       <button id="tab-hot" onclick="showTab('hot')">高原高温</button>
+      <button id="tab-delay" onclick="showTab('delay')">延误传播</button>
     </div>
     <div id="api-error"></div>
 
@@ -122,6 +123,35 @@
       <div class="card" id="hot-table"></div>
       <div class="card" id="hot-chart"></div>
     </div>
+
+    <div id="page-delay" style="display:none">
+      <div class="cols" style="margin-bottom:14px">
+        <div class="field"><label>数据源</label>
+          <select id="d-source">
+            <option value="synthetic">合成机队轮转（150 架 × 21 天，方法学演示）</option>
+            <option value="opensky">OpenSky 实测到达（ZSPD，需联网）</option>
+          </select>
+        </div>
+        <div class="field" id="d-synth-field"><label>机队规模（架）</label>
+          <input type="number" id="d-aircraft" value="150" min="5" max="500" step="10"></div>
+        <div class="field" id="d-synth-field2"><label>天数</label>
+          <input type="number" id="d-days" value="21" min="3" max="60" step="1"></div>
+        <div class="field" id="d-os-field" style="display:none"><label>机场（ICAO）</label>
+          <input type="text" id="d-os-airport" value="ZSPD" maxlength="4"></div>
+        <div class="field" style="align-self:flex-end">
+          <button id="d-run" onclick="runDelayAnalysis()">开始分析</button>
+        </div>
+      </div>
+      <div class="metrics" id="delay-metrics"></div>
+      <div class="card" id="delay-inheritance"></div>
+      <div class="cols">
+        <div class="card" id="delay-hubs"></div>
+        <div class="card" id="delay-flow"></div>
+      </div>
+      <div class="card note-card" id="delay-note">方法：机尾号轮转链（过站 ≤ 180 分钟）上的延误继承——
+        lift 明显大于 1 即传播信号；合成数据在生成时注入了传播机制，用于验证方法学（不是真实流量）；
+        OpenSky 模式用航线中位 block time 作伪时刻表、icao24 作机尾身份，匿名接口限流失败时自动提示回退。</div>
+    </div>
   </main>
 </div>
 
@@ -130,6 +160,6 @@
   <span>参数 · 公开手册量级与公开报道估计</span>
   <span><a href="https://github.com/sihanwang64-debug/c919-routelab" target="_blank" rel="noopener">GitHub 仓库</a></span>
 </footer>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

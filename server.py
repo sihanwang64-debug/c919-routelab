@@ -311,5 +311,122 @@ def hot_high(req: HotRequest) -> list[dict]:
     return rows
 
 
+class DelayRequest(BaseModel):
+    """Delay-propagation analysis parameters (synthetic or OpenSky data)."""
+
+    source: Literal["synthetic", "opensky"] = "synthetic"
+    n_aircraft: int = Field(default=120, ge=5, le=500)
+    n_days: int = Field(default=14, ge=3, le=60)
+    seed: int = Field(default=42)
+    opensky_airport: str = "ZSPD"
+    opensky_days: int = Field(default=3, ge=1, le=14)
+
+
+def _airport_label(ident: str) -> str:
+    """ICAO code + name when the bundled sample knows the airport."""
+    try:
+        return f"{ident} {_DB.get(ident).name}"
+    except KeyError:
+        return ident
+
+
+@app.post("/api/delay")
+def delay_analysis(req: DelayRequest) -> dict:
+    """Tail-rotation delay analysis: inheritance lift, hubs, airport flow.
+
+    ``source="synthetic"`` runs the honest synthetic fleet generator;
+    ``source="opensky"`` pulls real arrivals (cached on disk, retried) and
+    degrades with 502 when the anonymous API refuses.
+    """
+    import time as _time
+
+    from routelab.network import (
+        airport_centrality,
+        build_tail_chain,
+        delay_inheritance,
+        propagation_hubs,
+        synthesize_rotations,
+    )
+
+    if req.source == "opensky":
+        try:
+            from routelab.opensky import arrivals_to_flights, fetch_arrivals
+
+            end = int(_time.time()) - 6 * 3600  # feed lags ~5.5 h
+            begin = end - req.opensky_days * 86_400
+            raw = fetch_arrivals(
+                req.opensky_airport.upper(), begin, end,
+                cache_dir="data_cache/opensky",
+            )
+            flights = arrivals_to_flights(raw, min_route_samples=5)
+            if len(flights) < 100:
+                raise ValueError(
+                    f"only {len(flights)} usable rows for "
+                    f"{req.opensky_airport.upper()} in this window"
+                )
+        except (ImportError, RuntimeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"OpenSky 数据不可用：{exc}",
+            ) from exc
+    else:
+        flights = synthesize_rotations(
+            n_aircraft=req.n_aircraft, n_days=req.n_days, seed=req.seed
+        )
+
+    chain = build_tail_chain(flights, max_turnaround_min=180)
+    inheritance = [
+        delay_inheritance(flights, chain, threshold_min=t) for t in (15, 30, 60)
+    ]
+    hubs = propagation_hubs(flights, chain, threshold_min=15, min_turnarounds=30)
+    flow = airport_centrality(flights, chain, threshold_min=15)
+    delays_min = flights["actual_arr"] - flights["sched_arr"]
+
+    return {
+        "source": req.source,
+        "summary": {
+            "n_flights": int(len(flights)),
+            "n_tails": int(flights["registration"].nunique()),
+            "n_edges": int(sum(len(v) for v in chain.values())),
+            "mean_delay_min": round(delays_min.dt.total_seconds().mean() / 60.0, 1),
+        },
+        "inheritance": [
+            {
+                "threshold_min": s["threshold_min"],
+                "n_pairs": s["n_pairs"],
+                "n_prev_delayed": s["n_prev_delayed"],
+                "n_propagated": s["n_propagated"],
+                "p_next_delayed": round(s["p_next_delayed"], 3)
+                if s["p_next_delayed"] is not None else None,
+                "p_next_given_prev": round(s["p_next_given_prev"], 3)
+                if s["p_next_given_prev"] is not None else None,
+                "lift": round(s["lift"], 2) if s["lift"] is not None else None,
+            }
+            for s in inheritance
+        ],
+        "hubs": [
+            {
+                "airport": ident,
+                "label": _airport_label(ident),
+                "n_turnarounds": int(r["n_turnarounds"]),
+                "n_propagated": int(r["n_propagated"]),
+                "propagation_ratio": float(r["propagation_ratio"]),
+                "inherited_delay_min": float(r["inherited_delay_min"]),
+            }
+            for ident, r in hubs.head(8).iterrows()
+        ],
+        "flow": [
+            {
+                "airport": ident,
+                "label": _airport_label(ident),
+                "sent": float(r["sent"]),
+                "received": float(r["received"]),
+                "net": float(r["net"]),
+            }
+            for ident, r in flow.head(8).iterrows()
+        ],
+    }
+
+
 # Serve the frontend last so /api/* routes take precedence.
 app.mount("/", StaticFiles(directory=_WEB_DIR, html=True), name="web")

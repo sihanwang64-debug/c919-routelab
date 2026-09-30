@@ -150,3 +150,56 @@ def test_envelope_endpoint_openap_backend() -> None:
     ranges = body["max_range_km"]
     assert all(b >= a - 1e-6 for a, b in zip(ranges, ranges[1:]))
     assert ranges[-1] > ranges[0]
+
+
+def test_delay_endpoint_synthetic_detects_injected_propagation() -> None:
+    res = client.post("/api/delay", json={
+        "source": "synthetic", "n_aircraft": 30, "n_days": 5, "seed": 7,
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["source"] == "synthetic"
+    assert body["summary"]["n_flights"] > 100
+    assert body["summary"]["n_edges"] > 0
+    lifts = [r["lift"] for r in body["inheritance"]]
+    assert all(v is not None and v > 1.0 for v in lifts)  # injected by construction
+    assert len(body["hubs"]) > 0 and len(body["flow"]) > 0
+    assert body["hubs"][0]["label"]  # airport labels joined
+
+
+def test_delay_endpoint_opensky_with_mocked_fetch(monkeypatch) -> None:
+    import routelab.opensky as osky
+
+    def fake_fetch(airport, begin, end, **kwargs):
+        rows = []
+        # 3 airframes x 55 rotations: enough rows, one well-sampled route
+        for k in range(165):
+            icao = f"abc{k // 55:03d}"
+            base = 1_700_000_000 + k * 14_400
+            rows.append({
+                "icao24": icao, "firstSeen": base, "lastSeen": base + 4_800,
+                "estDepartureAirport": "ZSPD", "estArrivalAirport": "ZWWW",
+                "callsign": "CSN123  ",
+            })
+        return rows
+
+    monkeypatch.setattr(osky, "fetch_arrivals", fake_fetch)
+    res = client.post("/api/delay", json={
+        "source": "opensky", "opensky_airport": "ZSPD", "opensky_days": 3,
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["source"] == "opensky"
+    assert body["summary"]["n_tails"] == 3
+
+
+def test_delay_endpoint_opensky_failure_degrades(monkeypatch) -> None:
+    import routelab.opensky as osky
+
+    def dead_fetch(*a, **k):
+        raise RuntimeError("anonymous rate limit")
+
+    monkeypatch.setattr(osky, "fetch_arrivals", dead_fetch)
+    res = client.post("/api/delay", json={"source": "opensky"})
+    assert res.status_code == 502
+    assert "OpenSky" in res.json()["detail"]
