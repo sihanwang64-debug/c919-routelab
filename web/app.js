@@ -31,6 +31,23 @@ const PLOTLY_CONFIG = { responsive: true, displayModeBar: false, scrollZoom: tru
 // narrowbodies); only those present in the installed OpenAP are shown.
 const OPENAP_COMPARE = ["a320", "a20n", "a321", "b738", "b38m"];
 const OPENAP_SERIES_COLORS = [THEME.accent, THEME.crimson, THEME.sage, THEME.ochre, THEME.slateLight];
+
+// OpenAP uses ICAO type designators (a359, b77w, ...); map them to the
+// names people actually search for
+const TYPE_NAMES = {
+  a19n: "A319neo", a20n: "A320neo", a21n: "A321neo",
+  a318: "A318", a319: "A319", a320: "A320", a321: "A321",
+  a332: "A330-200", a333: "A330-300", a343: "A340-300",
+  a359: "A350-900", a388: "A380-800",
+  b37m: "737 MAX 7", b38m: "737 MAX 8", b39m: "737 MAX 9", b3xm: "737 MAX 10",
+  b734: "737-400", b737: "737-300", b738: "737-800", b739: "737-900",
+  b744: "747-400", b748: "747-8", b752: "757-200", b763: "767-300",
+  b772: "777-200", b773: "777-300", b77w: "777-300ER",
+  b788: "787-8", b789: "787-9",
+  c550: "Cessna 550", crj9: "CRJ-900", e145: "ERJ-145",
+  e170: "E170", e190: "E190", e195: "E195", e75l: "E175", glf6: "G650",
+};
+const typeLabel = (code) => code.toUpperCase() + (TYPE_NAMES[code] ? " · " + TYPE_NAMES[code] : "");
 function chartLayout(extra) {
   return Object.assign({
     paper_bgcolor: "rgba(0,0,0,0)",
@@ -313,9 +330,9 @@ async function renderEnv() {
     if (!envs) return;
     traces = envs.map(({ t, i, env }) => ({
       x: env.payload_kg.map((p) => p / 1000), y: env.max_range_km.map((r) => r / 1000),
-      mode: "lines", name: t.toUpperCase() + " (OpenAP)",
+      mode: "lines", name: typeLabel(t) + " (OpenAP)",
       line: { color: OPENAP_SERIES_COLORS[i % OPENAP_SERIES_COLORS.length], width: 2 },
-      hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + t.toUpperCase() + "</extra>",
+      hovertemplate: "业载 %{x:.1f} t · 航程 %{y:,.0f} km<extra>" + typeLabel(t) + "</extra>",
     }));
   } else {
     const jobs = [];
@@ -575,7 +592,7 @@ function applyBackendMode() {
   attachAirportSearch("hot", (a) => addHotAirport(a));
   if (state.aircraftTypes.length) {
     $("p-actype").innerHTML = state.aircraftTypes
-      .map((t) => `<option value="${t}">${t.toUpperCase()}</option>`).join("");
+      .map((t) => `<option value="${t}">${typeLabel(t)}</option>`).join("");
     $("p-actype").value = "a320";
   } else {
     $("p-backend").querySelector('option[value="openap"]').disabled = true;
