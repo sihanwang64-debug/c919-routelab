@@ -94,16 +94,42 @@ def test_adapt_sea_level_hub_is_ok(db: AirportDB):
     assert report.max_payload_kg == ProxyAircraft().max_payload_kg
 
 
-def test_adapt_plateau_pair_daocheng_vs_bangda(db: AirportDB):
-    # real-world pair from the full dataset: both ~14k ft, but Daocheng has
-    # a 4,200 m runway vs Bangda's 4,500 m -- Daocheng must be tighter
-    daocheng = adapt_for_airport(db, ProxyAircraft(), "ZUDC")
-    bangda = adapt_for_airport(db, ProxyAircraft(), "ZUBD")
+def test_adapt_plateau_pair_daocheng_vs_bangda(tmp_path):
+    # real-world pair (Daocheng 14,472 ft / 4,200 m vs Bangda 14,219 ft /
+    # 4,500 m) replayed on a self-contained mini-dataset so the test does
+    # not depend on the full OurAirports download
+    airport_header = (
+        "ident,type,name,latitude_deg,longitude_deg,elevation_ft,continent,"
+        "iso_country,iso_region,municipality,scheduled_service,iata_code"
+    )
+    runway_header = (
+        "id,airport_ref,airport_ident,length_ft,width_ft,surface,lighted,"
+        "closed,le_ident,he_ident"
+    )
+    airport_rows = [
+        "ZUDC,medium_airport,Daocheng Yading,29.0,100.0,14472,AS,CN,CN-SC,Daocheng,yes,DCY",
+        "ZUBD,medium_airport,Bangda,31.0,97.0,14219,AS,CN,CN-XZ,Bangda,yes,BPX",
+    ]
+    runway_rows = [
+        "1,1,ZUDC,13780,148,ASPH,1,0,18,36",
+        "2,2,ZUBD,14764,148,ASPH,1,0,09,27",
+    ]
+    airports_csv = tmp_path / "airports.csv"
+    airports_csv.write_text(
+        "\n".join([airport_header] + airport_rows) + "\n", encoding="utf-8"
+    )
+    runways_csv = tmp_path / "runways.csv"
+    runways_csv.write_text(
+        "\n".join([runway_header] + runway_rows) + "\n", encoding="utf-8"
+    )
+    mini = AirportDB(airports_csv=airports_csv, runways_csv=runways_csv)
+    daocheng = adapt_for_airport(mini, ProxyAircraft(), "ZUDC")
+    bangda = adapt_for_airport(mini, ProxyAircraft(), "ZUBD")
     assert daocheng.max_weight_fraction <= bangda.max_weight_fraction
     assert daocheng.verdict == "reduced" and daocheng.max_weight_fraction < 1.0
     assert bangda.verdict == "ok" and bangda.max_weight_fraction == 1.0
     assert daocheng.max_tow_kg < ProxyAircraft().mtow_kg
-    # at frac 0.999 the cut comes off the FUEL first: the structural payload
+    # at frac ~0.999 the cut comes off the FUEL first: the structural payload
     # still fits (weight room = max_tow - oew = 34.6 t > 18.5 t)
     assert daocheng.max_payload_kg == ProxyAircraft().max_payload_kg
 
