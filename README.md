@@ -5,6 +5,8 @@
 > 基于 100% 公开数据的单通道民机航线运行分析工具包（非官方学习项目）。
 > An open-source, learning-grade toolkit for route-level narrow-body operations analysis, built entirely on public data (unofficial study project).
 > Une boîte à outils open source et pédagogique pour l'analyse opérationnelle des lignes aériennes, construite uniquement à partir de données publiques (projet d'étude non officiel).
+>
+> 📘 在线文档 / Docs online : [https://sihanwang64-debug.github.io/c919-routelab/](https://sihanwang64-debug.github.io/c919-routelab/)
 
 ![CI](https://github.com/sihanwang64-debug/c919-routelab/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -215,7 +217,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 - [x] v0.1 仓库骨架：CLI + 大圆 + 机场数据 + 性能/油量内核 + CI
 - [x] v0.2 业载-航程案例 notebook + 高原高温案例 notebook
 - [x] 前后端分离 Web 版：FastAPI API（`server.py`）+ 原生前端（`web/`），`start_webapp.bat` 一键启动
-- [ ] 文档站上线 GitHub Pages（工作流已就绪并停用中：私有仓库需 GitHub Pro，转公开即可启用）
+- [x] 文档站上线 GitHub Pages：[https://sihanwang64-debug.github.io/c919-routelab/](https://sihanwang64-debug.github.io/c919-routelab/)
 - [x] OpenAP 研究级燃烧模型后端（`routelab/openap_backend.py`，CLI/API/界面均可切换）
 - [x] v0.3 延误传播网络分析：`network.py` 机尾链图 + lift/枢纽/流量指标 + 案例 03（合成数据验证方法学，OpenSky 实测对照带缓存与优雅回退）
 - [x] v0.4 案例 04 机队情景 + 完整 OurAirports 数据集下载脚本（`scripts/download_airports.py`）
