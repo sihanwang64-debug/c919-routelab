@@ -16,3 +16,6 @@ site/
 
 # local data caches (OpenSky etc.)
 data_cache/
+
+# local tooling
+.zcode/
