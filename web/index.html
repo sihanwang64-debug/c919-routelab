@@ -93,6 +93,7 @@
       <button id="tab-env" onclick="showTab('env')">业载–航程</button>
       <button id="tab-hot" onclick="showTab('hot')">高原高温</button>
       <button id="tab-delay" onclick="showTab('delay')">延误传播</button>
+      <button id="tab-adapt" onclick="showTab('adapt')">机场适配</button>
     </div>
     <div id="api-error"></div>
 
@@ -147,6 +148,25 @@
       <div class="card" id="hot-chart"></div>
     </div>
 
+    <div id="page-adapt" style="display:none">
+      <div class="cols" style="margin-bottom:14px">
+        <div class="field" style="flex:2"><label>机场（搜索，全球 86,000+）</label>
+          <div class="combo" id="combo-adapt">
+            <input type="text" class="combo-input" id="adapt-input" placeholder="搜索 ICAO / IATA / 城市（如 ZWSH、dao）" autocomplete="off">
+            <div class="combo-list" id="adapt-list"></div>
+          </div>
+        </div>
+        <div class="field"><label>假设温度偏移（ISA+）</label>
+          <input type="number" id="adapt-temp" value="15" min="-10" max="40" step="1"></div>
+      </div>
+      <div class="metrics" id="adapt-metrics"></div>
+      <div class="card" id="adapt-report"></div>
+      <div class="card" id="adapt-plateau"></div>
+      <div class="card note-card">判定标准：满载（MTOW、ISA+ 温度偏移）下启发式需要场长 ≤ 最长跑道 = 可用；
+        超出但重量削减后可容纳 = 减载（给出最大起飞重量系数与对应业载）；两者皆不满足 = 跑道不足。
+        场长为启发式（无障碍物/净空），着陆按 0.65 × 起飞粗估；基础值偏乐观，相对排名可靠。</div>
+    </div>
+
     <div id="page-delay" style="display:none">
       <div class="cols" style="margin-bottom:14px">
         <div class="field"><label>数据源</label>
@@ -187,6 +207,6 @@
   <span>参数 · 公开手册量级与公开报道估计</span>
   <span><a href="https://github.com/sihanwang64-debug/c919-routelab" target="_blank" rel="noopener">GitHub 仓库</a></span>
 </footer>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

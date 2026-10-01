@@ -38,6 +38,8 @@ class LegPlan:
     max_payload_on_leg_kg: float
     backend: str = "simple"
     actype: str | None = None
+    co2_kg: float = 0.0
+    co2_per_seat_km: float | None = None
 
     @property
     def feasible(self) -> bool:
@@ -55,11 +57,14 @@ def plan_leg(
     policy: FuelPolicy | None = None,
     backend: str = "simple",
     actype: str | None = None,
+    seats: int | None = None,
 ) -> LegPlan:
     """Plan one leg: route, block fuel breakdown, weight/tank feasibility.
 
     ``alternate`` is optional; without it a fixed default diversion distance
-    is assumed (learning-grade convention used by the CLI as well).
+    is assumed (learning-grade convention used by the CLI as well). When
+    ``seats`` is given, per-seat CO2 figures are attached (3.16 kg CO2 per
+    kg kerosene, ICAO/IPCC factor).
     """
     policy = policy or FuelPolicy()
     route = db.route(origin, destination)
@@ -83,7 +88,18 @@ def plan_leg(
         )
     else:
         raise ValueError(f"unknown backend {backend!r} (use 'simple' or 'openap')")
-    return plan
+
+    from dataclasses import replace
+
+    from routelab.emissions import co2_from_fuel_kg
+
+    co2 = co2_from_fuel_kg(plan.fuel.block_kg)
+    per_seat = (
+        co2 / (seats * plan.route.distance_km)
+        if seats and plan.route.distance_km
+        else None
+    )
+    return replace(plan, co2_kg=co2, co2_per_seat_km=per_seat)
 
 
 def _plan_leg_simple(
@@ -99,7 +115,8 @@ def _plan_leg_simple(
     fuel = block_fuel(ac, trip, alternate_distance_km, policy)
     fuel_limit_kg = min(ac.max_fuel_kg, ac.max_usable_weight_kg - payload_kg)
     max_payload = min(
-        ac.max_payload_kg, max(0.0, ac.max_usable_weight_kg - fuel.block_kg)
+        ac.max_payload_by_weight_limits_kg,
+        max(0.0, ac.max_usable_weight_kg - fuel.block_kg),
     )
     return LegPlan(
         route=route,

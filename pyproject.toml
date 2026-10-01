@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "c919-routelab"
-version = "1.0.0"
+version = "2.0.0"
 description = "Learning-grade narrow-body route operations analysis on public data (unofficial study project)."
 readme = "README.md"
 requires-python = ">=3.10"

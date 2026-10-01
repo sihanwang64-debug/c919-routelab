@@ -85,6 +85,12 @@ def aircraft_mass_limits(actype: str) -> tuple[float, float]:
     return float(meta["mtow"]), float(meta["oew"])
 
 
+def _aircraft_mlw(actype: str) -> float:
+    """Max landing weight (kg) from the OpenAP aircraft database."""
+    openap = _openap()
+    return float(openap.prop.aircraft(actype.lower())["mlw"])
+
+
 def _fuelflow(actype: str):
     """Cached FuelFlow instance -- construction costs tens of milliseconds."""
     key = actype.lower()

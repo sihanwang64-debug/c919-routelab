@@ -74,3 +74,11 @@ Assumptions to argue about:
 - the synthetic generator (`synthesize_rotations`) **injects** propagation by construction (arrival delay minus schedule recovery plus an exogenous heavy-tailed perturbation; overnight rest resets), so its lift is a methodological acceptance test, not an empirical finding — all registrations carry a `SIM-` prefix;
 - the OpenSky importer uses `icao24` as the airframe identity (the REST endpoint has no civil registration) and a **pseudo-schedule** (route-median observed block time) because the endpoint publishes no timetable; anonymous OpenSky access is rate-limited, and the fetcher caches every success to disk and degrades gracefully when the network refuses;
 - crew rotations, maintenance, ATC slotting and connection passengers are all real propagation channels left unmodelled.
+
+## 9. Airport adaptation (case 05, v2)
+
+The takeoff field length now scales with the square of takeoff-weight/MTOW (kinetic-energy-at-rotation scaling) -- inverting it gives the maximum weight a runway accepts, hence the payload cut for hot-and-high fields. Verdicts: **ok** (required <= runway at MTOW), **reduced** (fits after weight cut), **infeasible**. Landing distance is a flat 0.65 x takeoff figure. Temperatures are assumptions (ISA+15 hot-day default; OurAirports carries no climate data), the base field length is optimistic, so **absolute margins skew generous while the relative ranking holds** -- Daocheng (4,200 m runway, 14,472 ft) scoring tighter than Bangda (4,500 m) matches real operations. No obstacle/clearway analysis, no engine degradation, no MEL.
+
+## 10. Emissions (case 06, v2)
+
+Headline CO2 = block fuel x **3.16 kg CO2/kg kerosene** (ICAO/IPCC factor; stoichiometry makes this the robust part). Per-seat figures divide by seats x distance. NOx/H2O are demonstrated with OpenAP's Emission model (state-dependent rates, single-point in case 06, not integrated over the cruise). Carbon-price scenarios in case 06 are illustrative, not forecasts of CORSIA/ETS rules.

@@ -102,7 +102,9 @@ class AirportDB:
         self._by_code: dict[str, Airport] = {}
         for airport in self._airports:
             self._by_code[airport.ident.upper()] = airport
-            if airport.iata:
+            # with 86k entries small strips collide with real IATA codes --
+            # the ICAO ident is the authoritative key, IATA only fills gaps
+            if airport.iata and airport.iata.upper() not in self._by_code:
                 self._by_code[airport.iata.upper()] = airport
 
         rw_path = Path(runways_csv) if runways_csv else RUNWAYS_CSV

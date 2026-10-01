@@ -3,4 +3,4 @@
 Unofficial study project — not affiliated with COMAC. See DISCLAIMER.md.
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"

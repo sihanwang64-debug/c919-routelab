@@ -204,6 +204,8 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 | [02 高原高温](cases/02_hot_high.ipynb) | 浦东—乌鲁木齐/喀什：高温高原机场的起降场长余量与备降油量 | ✅ 已完成 |
 | [03 延误传播](cases/03_delay_network.ipynb) | 机尾号轮转链上的延误传染：lift 检验、传播枢纽、机场流量（合成数据 + OpenSky 对照） | ✅ 已完成 |
 | [04 机队情景](cases/04_fleet_scenario.ipynb) | 2026–2030 三种交付节奏下，机队何时撑起 18 条航线网络？座位投放与利用率敏感性 | ✅ 已完成 |
+| [05 机场适配](cases/05_airport_adaptation.ipynb) | 全球 86k 机场适配扫描：满载/减载/不足三分类，中国高高原专项，世界适配地图 | ✅ 已完成 |
+| [06 碳排放](cases/06_emissions.ipynb) | C919 vs A320neo 每座公里 CO₂、碳价情景对航线成本的影响、NOx 为何不是燃油乘数 | ✅ 已完成 |
 
 ## 方法学与诚实话
 
@@ -222,6 +224,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 - [x] v0.3 延误传播网络分析：`network.py` 机尾链图 + lift/枢纽/流量指标 + 案例 03（合成数据验证方法学，OpenSky 实测对照带缓存与优雅回退）
 - [x] v0.4 案例 04 机队情景 + 完整 OurAirports 数据集下载脚本（`scripts/download_airports.py`）
 - [x] v1.0 打 tag 发布（四个案例 + 双版本界面 + 两级性能模型齐备）
+- [x] v2.0 三大模块：全球机场适配性（重量参数化场长 + 86k 扫描 + 高高原专项）、碳排放（3.16 因子 + OpenAP 分项）、重量平衡深化（MZFW/MLW 三段式包线）
 
 ## 常见问题
 

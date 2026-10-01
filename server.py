@@ -56,10 +56,11 @@ app = FastAPI(
         "Learning-grade narrow-body route operations analysis "
         "(public data only, unofficial -- not for flight planning)."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=_lifespan,
 )
 _DB = AirportDB()
+_PROXY = ProxyAircraft()
 
 _WEB_DIR = Path(__file__).resolve().parent / "web"
 
@@ -70,6 +71,7 @@ _WEB_DIR = Path(__file__).resolve().parent / "web"
 class AircraftIn(BaseModel):
     """Editable proxy-aircraft parameters (defaults = A320neo-class proxy)."""
 
+    seats: int = Field(default=174, gt=0)
     mtow_kg: float = Field(default=79_000, gt=0)
     oew_kg: float = Field(default=44_300, gt=0)
     max_fuel_kg: float = Field(default=19_000, gt=0)
@@ -80,6 +82,7 @@ class AircraftIn(BaseModel):
     def to_proxy(self) -> ProxyAircraft:
         return ProxyAircraft(
             name="custom",
+            seats=self.seats,
             mtow_kg=self.mtow_kg,
             oew_kg=self.oew_kg,
             max_fuel_kg=self.max_fuel_kg,
@@ -219,6 +222,7 @@ def plan_route(req: RouteRequest) -> dict:
             req.payload_kg,
             req.headwind_kmh,
             req.policy.to_policy(),
+            seats=req.aircraft.seats,
             **_backend_kwargs(req),
         )
     except KeyError as exc:
@@ -247,6 +251,9 @@ def plan_route(req: RouteRequest) -> dict:
         "max_payload_on_leg_kg": plan.max_payload_on_leg_kg,
         "backend": plan.backend,
         "actype": plan.actype,
+        "co2_kg": round(plan.co2_kg, 1),
+        "co2_per_seat_km": round(plan.co2_per_seat_km, 5)
+        if plan.co2_per_seat_km is not None else None,
     }
 
 
@@ -461,6 +468,41 @@ def delay_analysis(req: DelayRequest) -> dict:
             for ident, r in flow.head(8).iterrows()
         ],
     }
+
+
+@app.get("/api/adaptation")
+def adaptation(ident: str, temp_c: float | None = None) -> dict:
+    """Airport adaptation report for the default proxy aircraft."""
+    from routelab.adaptability import adapt_for_airport
+
+    try:
+        report = adapt_for_airport(_DB, _PROXY, ident.upper(), temp_c)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {**asdict(report), "label": _airport_label(report.ident)}
+
+
+@app.get("/api/adaptation/plateau")
+def adaptation_plateau() -> list[dict]:
+    """Chinese high-plateau airports (>= 3500 ft) with adaptation verdicts."""
+    from routelab.adaptability import adapt_for_airport, plateau_airports
+
+    rows = []
+    for f in plateau_airports(_DB, min_elevation_ft=3500.0, country="CN"):
+        if f["runway_m"] < 2000:
+            continue
+        try:
+            report = adapt_for_airport(_DB, _PROXY, f["ident"], airport=_DB.get(f["ident"]))
+        except KeyError:
+            continue
+        rows.append(
+            {
+                **asdict(report),
+                "label": _airport_label(report.ident),
+            }
+        )
+    rows.sort(key=lambda r: r["max_weight_fraction"])
+    return rows[:12]
 
 
 # Serve the frontend last so /api/* routes take precedence.

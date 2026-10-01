@@ -215,3 +215,37 @@ def test_delay_endpoint_opensky_failure_degrades(monkeypatch) -> None:
     res = client.post("/api/delay", json={"source": "opensky"})
     assert res.status_code == 502
     assert "OpenSky" in res.json()["detail"]
+
+
+def test_adaptation_endpoint_zwsh_reduced() -> None:
+    res = client.get("/api/adaptation", params={"ident": "ZWSH", "temp_c": 45})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ident"] == "ZWSH"
+    assert body["verdict"] in ("ok", "reduced")
+    assert body["runway_m"] == pytest.approx(3200.0, rel=0.01)
+    assert "label" in body
+
+
+def test_adaptation_endpoint_unknown_airport_404() -> None:
+    res = client.get("/api/adaptation", params={"ident": "XXXX"})
+    assert res.status_code == 404
+
+
+def test_adaptation_plateau_endpoint() -> None:
+    res = client.get("/api/adaptation/plateau")
+    assert res.status_code == 200
+    rows = res.json()
+    assert rows, "plateau list is empty"
+    assert all(r["elevation_ft"] >= 3500.0 for r in rows)
+    assert rows[0]["max_weight_fraction"] <= rows[-1]["max_weight_fraction"]
+
+
+def test_route_endpoint_carries_co2() -> None:
+    res = client.post("/api/route", json={
+        "origin": "ZSPD", "destination": "ZWWW", "payload_kg": 15_000,
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["co2_kg"] == pytest.approx(body["block_kg"] * 3.16, rel=0.01)
+    assert body["co2_per_seat_km"] > 0

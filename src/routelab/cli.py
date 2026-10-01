@@ -51,6 +51,7 @@ def route_range(
     plan = plan_leg(
         db, _PROXY, origin, destination, alternate, payload, headwind, _POLICY,
         backend=backend, actype=actype if backend == "openap" else None,
+        seats=_PROXY.seats,
     )
     b = plan.fuel
     feasible = plan.feasible
@@ -73,6 +74,8 @@ def route_range(
             f"vs limit {plan.fuel_limit_kg:.0f} kg -> "
             + ("OK" if feasible else "NOT FEASIBLE (cut payload or shorten route)")
         ),
+        f"CO2          ~{plan.co2_kg:.0f} kg (3.16 x fuel, ICAO factor) "
+        f"= {plan.co2_per_seat_km * 1000:.1f} kg/1000 seat-km",
         "Note         learning-grade estimate, not for flight planning.",
     ]
     typer.echo("\n".join(lines))

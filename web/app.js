@@ -10,6 +10,7 @@ const state = { presets: {}, aircraftTypes: [], hotSelected: [], hotAirports: {}
 // airports picked via the search comboboxes (full airport objects from
 // /api/airports/search: ident/iata/name/lat_deg/lon_deg/elevation_ft/runway_m)
 const picked = { origin: null, dest: null, altn: null };
+let adaptAirport = null;
 
 // ------------------------------------------------------- chart theme
 
@@ -233,7 +234,8 @@ async function renderRoute() {
     <div class="metric"><div class="k">轮档油</div><div class="v">${fmt(plan.block_kg)}<span class="note">kg</span></div></div>
     <div class="metric"><div class="k">本航段可带业载</div><div class="v">${(plan.max_payload_on_leg_kg / 1000).toFixed(1)}<span class="note">t</span></div></div>
     <div class="metric"><div class="k">业载 ${$("p-payload").value} t 可行性</div>
-      <div class="v ${plan.feasible ? "ok" : "bad"}">${plan.feasible ? "可行" : "超限"}</div></div>`;
+      <div class="v ${plan.feasible ? "ok" : "bad"}">${plan.feasible ? "可行" : "超限"}</div></div>
+    <div class="metric"><div class="k">人均碳排</div><div class="v">${plan.co2_per_seat_km ? (plan.co2_per_seat_km * 1000).toFixed(0) : "--"}<span class="note">g/座km</span></div></div>`;
 
   $("fuel-table").innerHTML = `<table><tr><th>项目</th><th>kg</th></tr>
     <tr><td>航程油</td><td>${fmt(plan.trip_kg)}</td></tr>
@@ -242,7 +244,8 @@ async function renderRoute() {
     <tr><td>最终储备 ${$("p-fr").value} min</td><td>${fmt(plan.final_reserve_kg)}</td></tr>
     <tr><td>滑行</td><td>${fmt(plan.taxi_kg)}</td></tr>
     <tr><td><b>轮档油</b></td><td><b>${fmt(plan.block_kg)}</b></td></tr>
-    <tr><td>油量上限</td><td>${fmt(plan.fuel_limit_kg)}</td></tr></table>`;
+    <tr><td>油量上限</td><td>${fmt(plan.fuel_limit_kg)}</td></tr>
+    <tr><td>CO₂（3.16 × 燃油）</td><td>${fmt(plan.co2_kg)}</td></tr></table>`;
 
   if (!window.Plotly) return;
   const arc = arcPoints(o.lat_deg, o.lon_deg, d.lat_deg, d.lon_deg, 96);
@@ -431,11 +434,62 @@ async function renderHot() {
   }), PLOTLY_CONFIG);
 }
 
+// ------------------------------------------------------- tab 5 适配
+
+async function runAdapt() {
+  const a = adaptAirport;
+  if (!a) return;
+  const temp = $("adapt-temp") ? +$("adapt-temp").value : 15;
+  let report;
+  try {
+    report = await api(`/api/adaptation?ident=${a.ident}&temp_c=${temp}`);
+    clearApiError();
+  } catch (err) { showApiError(err); return; }
+  const vColor = { ok: "ok", reduced: "", infeasible: "bad" }[report.verdict] || "";
+  const vText = { ok: "满载可用", reduced: "减载可用", infeasible: "跑道不足" }[report.verdict];
+  $("adapt-metrics").innerHTML = `
+    <div class="metric"><div class="k">${report.label}</div>
+      <div class="v ${vColor}" style="font-size:17px">${vText}</div></div>
+    <div class="metric"><div class="k">需要场长</div><div class="v">${fmt(report.required_tofl_m)}<span class="note">m</span></div></div>
+    <div class="metric"><div class="k">可用跑道</div><div class="v">${fmt(report.runway_m)}<span class="note">m</span></div></div>
+    <div class="metric"><div class="k">最大起飞重量</div><div class="v">${(report.max_tow_kg / 1000).toFixed(1)}<span class="note">t（系数 ${report.max_weight_fraction}）</span></div></div>
+    <div class="metric"><div class="k">减载后最大业载</div><div class="v">${(report.max_payload_kg / 1000).toFixed(1)}<span class="note">t</span></div></div>
+    <div class="metric"><div class="k">着陆距离（粗估）</div><div class="v">${fmt(report.landing_distance_m)}<span class="note">m</span></div></div>`;
+  $("adapt-report").innerHTML = `<table>
+    <tr><th>项目</th><th>数值</th></tr>
+    <tr><td>标高</td><td>${fmt(report.elevation_ft)} ft</td></tr>
+    <tr><td>ISA 温度 / 假设温度</td><td>${report.isa_temp_c} °C / ${report.assumed_temp_c} °C（+${report.isa_dev_c}）</td></tr>
+    <tr><td>判定</td><td class="${vColor}">${vText}</td></tr>
+  </table>`;
+}
+
+let adaptPlateauDone = false;
+async function renderAdaptPlateau() {
+  if (adaptPlateauDone) return;
+  adaptPlateauDone = true;
+  try {
+    const rows = await api("/api/adaptation/plateau");
+    $("adapt-plateau").innerHTML = `<table>
+      <tr><th>中国高高原机场（≥ 3500 ft）</th><th>标高 ft</th><th>跑道 m</th>
+          <th>需要场长 m</th><th>重量系数</th><th>判定</th></tr>
+      ${rows.map((r) => `<tr><td>${r.label}</td><td>${fmt(r.elevation_ft)}</td>
+        <td>${fmt(r.runway_m)}</td><td>${fmt(r.required_tofl_m)}</td>
+        <td>${r.max_weight_fraction}</td>
+        <td class="${{ ok: "ok", reduced: "", infeasible: "bad" }[r.verdict]}">${{ ok: "满载可用", reduced: "减载可用", infeasible: "跑道不足" }[r.verdict]}</td></tr>`).join("")}
+    </table>`;
+  } catch (err) { /* plateau table is decorative; ignore failures */ }
+}
+
+function renderAdapt() {
+  renderAdaptPlateau();
+  return runAdapt();
+}
+
 // ------------------------------------------------------------- wiring
 
 function showTab(name) {
-  for (const p of ["route", "env", "hot", "delay"]) $("page-" + p).style.display = p === name ? "" : "none";
-  for (const t of ["route", "env", "hot", "delay"]) $("tab-" + t).classList.toggle("active", t === name);
+  for (const p of ["route", "env", "hot", "delay", "adapt"]) $("page-" + p).style.display = p === name ? "" : "none";
+  for (const t of ["route", "env", "hot", "delay", "adapt"]) $("tab-" + t).classList.toggle("active", t === name);
   renderActive(name);
 }
 
@@ -445,7 +499,8 @@ function renderActive(name = currentTab) {
   const fn = name === "route" ? renderRoute
     : name === "env" ? renderEnv
     : name === "hot" ? renderHot
-    : renderDelay;
+    : name === "delay" ? renderDelay
+    : renderAdapt;
   fn().catch(console.error);
 }
 
@@ -590,6 +645,11 @@ function applyBackendMode() {
   attachAirportSearch("dest", (a) => { picked.dest = a; renderActive(); });
   attachAirportSearch("altn", (a) => { picked.altn = a; renderActive(); }, { clearable: true });
   attachAirportSearch("hot", (a) => addHotAirport(a));
+  attachAirportSearch("adapt", (a) => { adaptAirport = a; runAdapt().catch(console.error); });
+  try {
+    adaptAirport = await fetchAirport("ZWSH");
+    if (adaptAirport) $("adapt-input").value = comboDisplay(adaptAirport);
+  } catch { /* defaults resolve independently */ }
   if (state.aircraftTypes.length) {
     $("p-actype").innerHTML = state.aircraftTypes
       .map((t) => `<option value="${t}">${typeLabel(t)}</option>`).join("");
