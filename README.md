@@ -23,7 +23,7 @@
 ### 特性
 
 - 🌍 大圆航距与初始航向（球面近似，误差约 0.5% 量级，见[方法学](docs/methodology.md)）
-- 🛫 机场与跑道数据层（内置 [OurAirports](https://ourairports.com/data/) 公有领域数据样本，可通过环境变量切换完整数据集）
+- 🛫 机场与跑道数据层（内置 [OurAirports](https://ourairports.com/data/) 样本开箱即用；一键下载 86k 全量机场，放入 data_cache/ 自动生效；界面支持 ICAO/IATA/城市搜索）
 - ✈️ 两级性能模型：简化常数油耗（默认）+ 可选 [OpenAP](https://github.com/junzis/openap) 研究级燃烧模型（油耗随重量变化，`pip install -e ".[perf]"`）
 - 📊 业载-航程包线（payload–range envelope）
 - ⛽ 简化油量政策，逐项输出 breakdown
@@ -140,7 +140,7 @@ src/routelab/（计算内核：airports / performance / fuel / planning / preset
 
 ### 航线规划
 
-1. 下拉选择**出发 / 到达 / 备降**机场（内置 11 个样本机场，国内 8 个；接入完整 OurAirports 数据集的方法见[数据来源](docs/data-sources.md)）；
+1. 搜索选择**出发 / 到达 / 备降**机场——默认内置样本，下载全量数据集后可搜全球 86,000+ 机场（支持 ICAO / IATA / 城市英文名联想，输入 ≥2 字符即出结果）；
 2. 地图即时画出大圆航线（红色实线）与备降航段（橙色虚线），悬停机场标记可看标高；
 3. 下方给出航距（km/NM）、航程时间、轮档油、本航段可带业载与可行性判定，以及轮档油构成的条形图与明细表。
 
@@ -226,7 +226,7 @@ Web 界面与 CLI 共用同一个计算层 `routelab.planning.plan_leg()`，两�
 - **页面打开后图表空白？** 静态资源带版本号缓存，先按 `Ctrl+F5` 强制刷新；图表库已打包在 `web/vendor/`，正常情况无需联网。
 - **启动报 `WinError 10048`（端口被占用）？** 已有一个实例在运行——先关掉旧实例再启动（或修改 `run_server.py` 里的 `PORT`）。
 - **「性能模型」里 OpenAP 选项是灰色的？** 未安装 openap（`pip install -e ".[perf]"`）或 Python 版本低于 3.11。缺失时程序照常运行，只是该选项不可用。
-- **机场太少 / 想加机场？** 运行 `python scripts/download_airports.py` 下载完整数据集（86k 机场，含 ft→m 兼容），脚本会打印需要设置的两个环境变量，见[数据来源](docs/data-sources.md)。
+- **机场太少 / 想加机场？** 运行 `python scripts/download_airports.py` 下载完整数据集（86k 机场）并**重启应用即自动生效**（放入 data_cache/ 自动检测，无需环境变量）；界面搜索框输入 ICAO / IATA / 城市英文名即可查全球机场，详见[数据来源](docs/data-sources.md)。
 - **C919 的参数是官方的吗？** 不是——COMAC 未公开性能数据，参数来自公开报道与估计并逐项标注（见[方法学](docs/methodology.md)），仅作学习演示。
 
 ## English

@@ -27,14 +27,26 @@ openap_required = pytest.mark.skipif(
 )
 
 
-def test_airports_endpoint_lists_bundled_sample() -> None:
-    res = client.get("/api/airports")
+def test_airports_endpoint_respects_limit() -> None:
+    res = client.get("/api/airports", params={"limit": 500})
     assert res.status_code == 200
     body = res.json()
-    assert len(body) == len(AirportDB().all())
-    zspd = next(a for a in body if a["ident"] == "ZSPD")
-    assert zspd["iata"] == "PVG"
-    assert zspd["runway_m"] == 4000.0
+    assert 0 < len(body) <= 500
+    assert all({"ident", "lat_deg", "runway_m"} <= set(r) for r in body)
+
+
+def test_airports_search_endpoint() -> None:
+    res = client.get("/api/airports/search", params={"q": "urc", "limit": 5})
+    assert res.status_code == 200
+    body = res.json()
+    assert body[0]["ident"] == "ZWWW"          # IATA exact/prefix first
+    assert all({"lat_deg", "lon_deg", "runway_m"} <= set(r) for r in body)
+
+
+def test_airports_search_endpoint_short_query() -> None:
+    res = client.get("/api/airports/search", params={"q": "Z"})
+    assert res.status_code == 200
+    assert res.json() == []
 
 
 def test_presets_endpoint_has_three_aircraft() -> None:

@@ -248,11 +248,13 @@ def synthesize_rotations(
     dataset whose ground-truth propagation strength is known by
     construction. Defaults reproduce with a fixed ``seed``.
     """
-    from routelab.airports import AirportDB
-
     rng = np.random.default_rng(seed)
-    db = AirportDB()
-    pool = airport_pool or [a.ident for a in db.by_country("CN")]
+    # a compact trunk network keeps rotations dense enough for the hub
+    # metrics regardless of whether the bundled sample or the full 86k
+    # OurAirports dataset is installed
+    pool = airport_pool or [
+        "ZSPD", "ZBAA", "ZGGG", "ZUUU", "ZLXY", "ZWWW", "ZWSH", "ZPPP",
+    ]
     if len(pool) < 3:
         raise ValueError("airport_pool needs at least three airports")
     hub = pool[0]  # pool[0] acts as the main base airport
@@ -269,7 +271,7 @@ def synthesize_rotations(
             n_legs = int(rng.integers(3, 6))
             for _leg in range(n_legs):
                 destination = rng.choice([p for p in pool if p != origin])
-                distance_km = haversine_between(db, origin, destination)
+                distance_km = haversine_between(airport_db(), origin, destination)
                 block_h = distance_km / 780.0 + 0.55
                 sched_dep = clock
                 sched_arr = clock + pd.to_timedelta(block_h * 60, unit="min")
@@ -317,3 +319,10 @@ def haversine_between(db, a: str, b: str) -> float:
 
     x, y = db.get(a), db.get(b)
     return haversine_distance_km(x.lat_deg, x.lon_deg, y.lat_deg, y.lon_deg)
+
+
+def airport_db():
+    """Shared AirportDB (cached by the airports module across calls)."""
+    from routelab.airports import AirportDB
+
+    return AirportDB()

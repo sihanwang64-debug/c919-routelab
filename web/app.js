@@ -6,7 +6,10 @@ const $ = (id) => document.getElementById(id);
 const fmt = (v, d = 0) =>
   v == null ? "--" : v.toLocaleString("zh-CN", { maximumFractionDigits: d });
 
-const state = { airports: [], presets: {}, aircraftTypes: [] };
+const state = { presets: {}, aircraftTypes: [], hotSelected: [], hotAirports: {} };
+// airports picked via the search comboboxes (full airport objects from
+// /api/airports/search: ident/iata/name/lat_deg/lon_deg/elevation_ft/runway_m)
+const picked = { origin: null, dest: null, altn: null };
 
 // ------------------------------------------------------- chart theme
 
@@ -36,12 +39,6 @@ function chartLayout(extra) {
     hoverlabel: { bgcolor: "#23272b", bordercolor: "#23272b", font: { color: "#f6f5f1", size: 12 } },
     margin: { l: 60, r: 14, t: 40, b: 40 },
   }, extra);
-}
-
-// API returns lat_deg/lon_deg (Airport dataclass fields); add short aliases
-// once at load so every consumer can use a.lat / a.lon.
-function normalizeAirport(a) {
-  return { ...a, lat: a.lat_deg, lon: a.lon_deg };
 }
 
 // ------------------------------------------------------------- helpers
@@ -119,29 +116,89 @@ function arcPoints(lat1, lon1, lat2, lon2, n) {
 
 // ------------------------------------------------------------- tab 1
 
-function fillSelects() {
-  const cn = state.airports.filter((a) => a.ident.startsWith("Z"));
-  const other = state.airports.filter((a) => !a.ident.startsWith("Z"));
-  const all = [...cn, ...other];
-  const mk = (sel, list, none) => {
-    sel.innerHTML =
-      (none ? `<option value="-">${none}</option>` : "") +
-      list.map((a) => `<option value="${a.ident}">${a.ident}（${a.iata || "--"}）${a.name}</option>`).join("");
+// ------------------------------------------------- airport search combos
+
+function debounce(fn, ms) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
   };
-  mk($("origin"), all); $("origin").value = "ZSPD";
-  mk($("dest"), all.filter((a) => a.ident !== "ZSPD")); $("dest").value = "ZWWW";
-  mk($("altn"), all, "（无备降，按 300 km 默认）");
+}
+
+function comboDisplay(a) {
+  return `${a.ident}${a.iata ? "（" + a.iata + "）" : ""} ${a.name}`;
+}
+
+function attachAirportSearch(name, onPick, { clearable = false } = {}) {
+  const input = $(name + "-input");
+  const list = $(name + "-list");
+  if (!input || !list) return;
+
+  const hide = () => { list.classList.remove("open"); list.innerHTML = ""; };
+  const render = (hits) => {
+    if (!hits.length) {
+      list.innerHTML = '<div class="search-empty">无匹配机场</div>';
+    } else {
+      list.innerHTML = hits
+        .map((a, k) => `
+          <div class="search-item${k === 0 ? " active" : ""}" data-ident="${a.ident}">
+            <span class="code">${a.ident}</span>${a.name}
+            <span class="meta">${a.iata || "--"} · ${a.municipality || a.country || ""}</span>
+          </div>`)
+        .join("");
+      list.querySelectorAll(".search-item").forEach((el) => {
+        el.addEventListener("mousedown", (ev) => {
+          ev.preventDefault();
+          const a = hits.find((h) => h.ident === el.dataset.ident);
+          input.value = comboDisplay(a);
+          hide();
+          onPick(a);
+        });
+      });
+    }
+    list.classList.add("open");
+  };
+
+  const run = debounce(async () => {
+    const q = input.value.trim();
+    if (q.length < 2) { hide(); return; }
+    try {
+      const hits = await api(`/api/airports/search?q=${encodeURIComponent(q)}&limit=8`);
+      render(hits);
+    } catch { /* transient network errors stay silent in the dropdown */ }
+  }, 200);
+
+  input.addEventListener("input", () => {
+    if (clearable && !input.value.trim()) onPick(null);
+    run();
+  });
+  input.addEventListener("blur", () => setTimeout(hide, 150));
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      const first = list.querySelector(".search-item");
+      if (first) first.dispatchEvent(new Event("mousedown"));
+    }
+    if (ev.key === "Escape") hide();
+  });
+}
+
+async function fetchAirport(ident) {
+  const hits = await api(`/api/airports/search?q=${ident}&limit=1`);
+  return hits[0] || null;
 }
 
 async function renderRoute() {
-  const o = state.airports.find((a) => a.ident === $("origin").value);
-  const d = state.airports.find((a) => a.ident === $("dest").value);
-  const altV = $("altn").value;
+  const o = picked.origin;
+  const d = picked.dest;
+  const alt = picked.altn;
+  if (!o || !d) return;   // wait until the default airports resolved
   let plan;
   try {
     plan = await api("/api/route", {
       origin: o.ident, destination: d.ident,
-      alternate: altV !== "-" ? altV : "",
+      alternate: alt ? alt.ident : "",
       payload_kg: +$("p-payload").value * 1000,
       headwind_kmh: +$("p-wind").value,
       aircraft: aircraftPayload(), policy: policyPayload(),
@@ -152,7 +209,6 @@ async function renderRoute() {
     showApiError(err);
     return;
   }
-  const alt = altV !== "-" ? state.airports.find((a) => a.ident === altV) : null;
 
   $("route-metrics").innerHTML = `
     <div class="metric"><div class="k">航距</div><div class="v">${fmt(plan.distance_km)} km<span class="note">${fmt(plan.distance_nm)} NM</span></div></div>
@@ -172,7 +228,7 @@ async function renderRoute() {
     <tr><td>油量上限</td><td>${fmt(plan.fuel_limit_kg)}</td></tr></table>`;
 
   if (!window.Plotly) return;
-  const arc = arcPoints(o.lat, o.lon, d.lat, d.lon, 96);
+  const arc = arcPoints(o.lat_deg, o.lon_deg, d.lat_deg, d.lon_deg, 96);
   const traces = [{
     type: "scattergeo", mode: "lines",
     lon: arc.map((p) => p[1]), lat: arc.map((p) => p[0]),
@@ -182,15 +238,15 @@ async function renderRoute() {
   if (alt) marks.push([alt, "备降", THEME.ochre]);
   for (const [ap, role, color] of marks) {
     traces.push({
-      type: "scattergeo", mode: "markers+text", lon: [ap.lon], lat: [ap.lat],
+      type: "scattergeo", mode: "markers+text", lon: [ap.lon_deg], lat: [ap.lat_deg],
       text: [ap.ident], textposition: "top center",
       marker: { size: 8, color }, name: `${role} ${ap.ident}`,
       textfont: { size: 11, color: "#4a4f55" },
-      hovertext: `${ap.ident} ${ap.name}｜标高 ${fmt(ap.elev_ft)} ft｜跑道 ${fmt(ap.runway_m)} m`,
+      hovertext: `${ap.ident} ${ap.name}｜标高 ${fmt(ap.elevation_ft)} ft｜跑道 ${fmt(ap.runway_m)} m`,
     });
   }
   if (alt) {
-    const arc2 = arcPoints(d.lat, d.lon, alt.lat, alt.lon, 64);
+    const arc2 = arcPoints(d.lat_deg, d.lon_deg, alt.lat_deg, alt.lon_deg, 64);
     traces.push({
       type: "scattergeo", mode: "lines",
       lon: arc2.map((p) => p[1]), lat: arc2.map((p) => p[0]),
@@ -303,13 +359,30 @@ async function renderEnv() {
 
 // ------------------------------------------------------------- tab 3
 
+const HOT_DEFAULT_T = { ZSPD: 33, ZWWW: 34, ZWSH: 34, ZPPP: 24 };
+
 function fillHotTemps() {
-  $("hot-temps").innerHTML = state.airports
-    .filter((a) => a.ident.startsWith("Z"))
-    .map((a) => `
-      <div class="field"><label>${a.ident} ${a.iata} 温度 °C</label>
-      <input type="number" class="hot-t" id="t-${a.ident}" value="${{ ZSPD: 33, ZWWW: 34, ZWSH: 34, ZPPP: 24 }[a.ident] ?? 30}" step="1" min="-20" max="55"></div>`)
+  $("hot-temps").innerHTML = state.hotSelected
+    .map((ident) => {
+      const a = state.hotAirports[ident];
+      return `
+      <div class="field"><label>${a.ident} ${a.iata || ""} 温度 °C</label>
+      <input type="number" class="hot-t" id="t-${a.ident}" value="${HOT_DEFAULT_T[a.ident] ?? 30}" step="1" min="-20" max="55"></div>`;
+    })
     .join("");
+}
+
+function addHotAirportRaw(a) {
+  if (!a || state.hotSelected.includes(a.ident)) return;
+  state.hotSelected.push(a.ident);
+  state.hotAirports[a.ident] = a;
+}
+
+function addHotAirport(a) {
+  if (!a || state.hotSelected.includes(a.ident) || state.hotSelected.length >= 12) return;
+  addHotAirportRaw(a);
+  fillHotTemps();
+  renderHot().catch(console.error);
 }
 
 async function renderHot() {
@@ -478,20 +551,28 @@ function applyBackendMode() {
 (async function init() {
   if (!window.Plotly) $("plot-error").style.display = "block";
   try {
-    const [airports, presets, aircraftTypes] = await Promise.all([
-      api("/api/airports"), api("/api/presets"), api("/api/aircraft-types"),
+    const [defaults, presets, aircraftTypes] = await Promise.all([
+      Promise.all(["ZSPD", "ZWWW", "ZWSH", "ZPPP"].map((i) => fetchAirport(i))),
+      api("/api/presets"), api("/api/aircraft-types"),
     ]);
-    state.airports = airports.map(normalizeAirport);
     state.presets = presets;
     state.aircraftTypes = aircraftTypes;
+    const [o, d, h1, h2] = defaults;
+    for (const a of [o, d, h1, h2]) addHotAirportRaw(a);
+    if (o) picked.origin = o;
+    if (d) picked.dest = d;
   } catch (err) {
     // aircraft-types 503 = openap not installed: degrade gracefully
     try {
-      const [airports, presets] = await Promise.all([api("/api/airports"), api("/api/presets")]);
-      state.airports = airports.map(normalizeAirport);
-      state.presets = presets;
+      state.presets = await api("/api/presets");
     } catch (e2) { showApiError(e2); }
   }
+  if (picked.origin) $("origin-input").value = comboDisplay(picked.origin);
+  if (picked.dest) $("dest-input").value = comboDisplay(picked.dest);
+  attachAirportSearch("origin", (a) => { picked.origin = a; renderActive(); });
+  attachAirportSearch("dest", (a) => { picked.dest = a; renderActive(); });
+  attachAirportSearch("altn", (a) => { picked.altn = a; renderActive(); }, { clearable: true });
+  attachAirportSearch("hot", (a) => addHotAirport(a));
   if (state.aircraftTypes.length) {
     $("p-actype").innerHTML = state.aircraftTypes
       .map((t) => `<option value="${t}">${t.toUpperCase()}</option>`).join("");
@@ -503,7 +584,7 @@ function applyBackendMode() {
   $("d-source").addEventListener("change", applyDelaySourceMode);
   applyBackendMode();
   applyDelaySourceMode();
-  fillSelects(); fillHotTemps(); fillOpenapCompare();
+  fillHotTemps(); fillOpenapCompare();
   document.querySelectorAll("input,select").forEach((el) => {
     el.addEventListener("input", scheduleRender);
     el.addEventListener("change", scheduleRender);

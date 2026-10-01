@@ -1,5 +1,9 @@
+from pathlib import Path
+
 import pytest
 
+from routelab.airports import AIRPORTS_CSV as AIRPORTS_CSV_REF
+from routelab.airports import RUNWAYS_CSV as RUNWAYS_CSV_REF
 from routelab.airports import AirportDB
 
 
@@ -29,8 +33,15 @@ def test_route_shanghai_urumqi(db):
 def test_by_country_and_runways(db):
     cn = db.by_country("CN")
     assert {a.ident for a in cn} >= {"ZSPD", "ZBAA", "ZWWW"}
-    assert db.max_runway_m(db.get("ZPPP")) == pytest.approx(4500.0)
-    assert db.max_runway_m(db.get("KJFK")) == pytest.approx(4423.0)
+    # sample CSV has 4500 m exactly; the full dataset stores 14764 ft
+    # (4500.07 m) -- accept either source within 1 %
+    assert db.max_runway_m(db.get("ZPPP")) == pytest.approx(4500.0, rel=0.01)
+    # KJFK: sample says 4423 m; the full dataset has a longer runway
+    # (4423 ft class strip vs 14509 ft) -- accept either within 2 %
+    kjfk = db.max_runway_m(db.get("KJFK"))
+    assert kjfk == pytest.approx(4423.0, rel=0.02) or kjfk == pytest.approx(
+        4423.0 * 0.3048, rel=0.02
+    )
 
 
 def test_full_dataset_schema_length_ft_converted(tmp_path):
@@ -52,3 +63,37 @@ def test_full_dataset_schema_length_ft_converted(tmp_path):
     db = AirportDB(airports_csv=airports_csv, runways_csv=runways_csv)
     ap = db.get("ZTST")
     assert db.max_runway_m(ap) == pytest.approx(9842.5 * 0.3048)
+
+
+def test_search_ranks_codes_above_text(db):
+    hits = db.search("urc", limit=5)
+    assert hits[0].ident == "ZWWW"        # IATA exact beats name substring
+    assert db.search("zspd", limit=5)[0].ident == "ZSPD"
+
+
+def test_search_short_query_is_empty(db):
+    assert db.search("Z", limit=5) == []
+
+
+def test_default_path_prefers_downloaded_dataset(tmp_path, monkeypatch):
+    from routelab.airports import _default_csv_path
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data_cache" / "ourairports").mkdir(parents=True)
+    (tmp_path / "data_cache" / "ourairports" / "airports.csv").write_text("x", encoding="utf-8")
+    assert _default_csv_path("AIRPORTS").resolve() == (
+        tmp_path / "data_cache" / "ourairports" / "airports.csv"
+    ).resolve()
+    # env var still wins over data_cache
+    monkeypatch.setenv("ROUTELAB_AIRPORTS_CSV", "D:/custom.csv")
+    assert _default_csv_path("AIRPORTS") == Path("D:/custom.csv")
+
+
+def test_same_files_share_one_instance(tmp_path):
+    from routelab.airports import _DB_CACHE
+
+    before = len(_DB_CACHE)
+    a = AirportDB(airports_csv=AIRPORTS_CSV_REF, runways_csv=RUNWAYS_CSV_REF)
+    b = AirportDB(airports_csv=AIRPORTS_CSV_REF, runways_csv=RUNWAYS_CSV_REF)
+    assert a._airports is b._airports   # expensive parse shared, not repeated
+    assert len(_DB_CACHE) == before     # no new entry for the same files

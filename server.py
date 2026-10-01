@@ -151,14 +151,20 @@ def _critical_temp_c(elev_ft: float, runway_m: float) -> float | None:
 
 
 @app.get("/api/airports")
-def list_airports() -> list[dict]:
-    """All bundled airports with position, elevation and longest runway."""
+def list_airports(limit: int = 200) -> list[dict]:
+    """Airports with position, elevation and longest runway.
+
+    With the full OurAirports dataset installed this is tens of thousands
+    of rows -- the frontend uses ``/api/airports/search`` instead, so the
+    response is capped by ``limit`` (use a large value to dump everything).
+    """
+    airports = _DB.all()[: max(0, limit)]
     return [
         {
             **asdict(a),
             "runway_m": _DB.max_runway_m(a),
         }
-        for a in _DB.all()
+        for a in airports
     ]
 
 
@@ -309,6 +315,27 @@ def hot_high(req: HotRequest) -> list[dict]:
             }
         )
     return rows
+
+
+@app.get("/api/airports/search")
+def search_airports(q: str, limit: int = 8) -> list[dict]:
+    """Find airports by ICAO/IATA code or name/city substring (top matches).
+
+    Ranked: exact code match, then code prefix, then name/city substring.
+    Returns everything the map and metrics need (position, elevation,
+    longest runway).
+    """
+    try:
+        hits = _DB.search(q, limit=min(max(limit, 1), 25))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return [
+        {
+            **asdict(a),
+            "runway_m": _DB.max_runway_m(a),
+        }
+        for a in hits
+    ]
 
 
 class DelayRequest(BaseModel):

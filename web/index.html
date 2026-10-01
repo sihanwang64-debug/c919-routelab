@@ -98,9 +98,24 @@
 
     <div id="page-route">
       <div class="cols" style="margin-bottom:14px">
-        <div class="field"><label>出发机场</label><select id="origin"></select></div>
-        <div class="field"><label>到达机场</label><select id="dest"></select></div>
-        <div class="field"><label>备降机场</label><select id="altn"></select></div>
+        <div class="field"><label>出发机场</label>
+          <div class="combo" id="combo-origin">
+            <input type="text" class="combo-input" id="origin-input" placeholder="搜索 ICAO / IATA / 城市（英文，如 ZSPD、urc、shanghai）" autocomplete="off">
+            <div class="combo-list" id="origin-list"></div>
+          </div>
+        </div>
+        <div class="field"><label>到达机场</label>
+          <div class="combo" id="combo-dest">
+            <input type="text" class="combo-input" id="dest-input" placeholder="搜索机场（86,000+ 全量）" autocomplete="off">
+            <div class="combo-list" id="dest-list"></div>
+          </div>
+        </div>
+        <div class="field"><label>备降机场（留空 = 默认 300 km）</label>
+          <div class="combo" id="combo-altn">
+            <input type="text" class="combo-input" id="altn-input" placeholder="搜索备降机场" autocomplete="off">
+            <div class="combo-list" id="altn-list"></div>
+          </div>
+        </div>
       </div>
       <div class="card" id="map"></div>
       <div class="metrics" id="route-metrics"></div>
@@ -119,7 +134,15 @@
     </div>
 
     <div id="page-hot" style="display:none">
-      <div class="card"><div class="temp-grid" id="hot-temps"></div></div>
+      <div class="card">
+        <div class="field" style="max-width:420px"><label>添加机场（搜索后自动加入对比，默认 4 个）</label>
+          <div class="combo" id="combo-hot">
+            <input type="text" class="combo-input" id="hot-input" placeholder="搜索 ICAO / IATA / 城市" autocomplete="off">
+            <div class="combo-list" id="hot-list"></div>
+          </div>
+        </div>
+        <div class="temp-grid" id="hot-temps"></div>
+      </div>
       <div class="card" id="hot-table"></div>
       <div class="card" id="hot-chart"></div>
     </div>
@@ -164,6 +187,6 @@
   <span>参数 · 公开手册量级与公开报道估计</span>
   <span><a href="https://github.com/sihanwang64-debug/c919-routelab" target="_blank" rel="noopener">GitHub 仓库</a></span>
 </footer>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

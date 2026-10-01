@@ -2,10 +2,13 @@
 
 The bundled CSV files are a tiny hand-picked sample of the OurAirports open
 dataset (public domain), shipped inside the package so the toolkit works
-offline out of the box. To use the full dataset, download airports.csv and
-runways.csv from https://ourairports.com/data/ and point the environment
-variables ROUTELAB_AIRPORTS_CSV / ROUTELAB_RUNWAYS_CSV at them -- the loader
-reads a documented column subset, identical to the bundled sample files.
+offline out of the box. To use the full dataset (~86k airports), either run
+``python scripts/download_airports.py`` (which drops both files into
+``data_cache/ourairports/`` -- picked up automatically on the next start)
+or point the environment variables ``ROUTELAB_AIRPORTS_CSV`` /
+``ROUTELAB_RUNWAYS_CSV`` at downloaded copies yourself. The loader reads a
+documented column subset and accepts both OurAirports runway dialects
+(``length_m`` sample / ``length_ft`` full dataset).
 """
 
 from __future__ import annotations
@@ -19,12 +22,23 @@ import pandas as pd
 from routelab.greatcircle import Route, route_between
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
-AIRPORTS_CSV = Path(
-    os.environ.get("ROUTELAB_AIRPORTS_CSV", _DATA_DIR / "ourairports" / "airports.csv")
-)
-RUNWAYS_CSV = Path(
-    os.environ.get("ROUTELAB_RUNWAYS_CSV", _DATA_DIR / "ourairports" / "runways.csv")
-)
+
+
+def _default_csv_path(kind: str) -> Path:
+    """Resolution order: env var > data_cache full dataset > bundled sample."""
+    env = os.environ.get(f"ROUTELAB_{kind}_CSV")
+    if env:
+        return Path(env)
+    downloaded = Path("data_cache") / "ourairports" / f"{kind.lower()}.csv"
+    if downloaded.exists():
+        return downloaded
+    return _DATA_DIR / "ourairports" / f"{kind.lower()}.csv"
+
+
+AIRPORTS_CSV = _default_csv_path("AIRPORTS")
+RUNWAYS_CSV = _default_csv_path("RUNWAYS")
+
+_DB_CACHE: dict[tuple, "AirportDB"] = {}
 
 
 @dataclass(frozen=True)
@@ -53,24 +67,37 @@ class AirportDB:
         airports_csv: Path | None = None,
         runways_csv: Path | None = None,
     ) -> None:
+        key = (
+            str(airports_csv) if airports_csv else str(AIRPORTS_CSV),
+            str(runways_csv) if runways_csv else str(RUNWAYS_CSV),
+        )
+        cached = _DB_CACHE.get(key)
+        if cached is not None:
+            # the full 86k-airport dataset costs seconds to parse; instances
+            # over the same files are shared read-only
+            self.__dict__.update(cached.__dict__)
+            return
+
         csv_path = Path(airports_csv) if airports_csv else AIRPORTS_CSV
         df = pd.read_csv(csv_path, dtype=str)
         df["latitude_deg"] = pd.to_numeric(df["latitude_deg"])
         df["longitude_deg"] = pd.to_numeric(df["longitude_deg"])
         df["elevation_ft"] = pd.to_numeric(df["elevation_ft"])
         df["iata_code"] = df["iata_code"].fillna("")
+        df["municipality"] = df["municipality"].fillna("")
+        df["name"] = df["name"].fillna("")
         self._airports = [
             Airport(
-                ident=row["ident"],
-                name=row["name"],
-                iata=row["iata_code"],
-                iso_country=row["iso_country"],
-                municipality=row["municipality"],
-                lat_deg=float(row["latitude_deg"]),
-                lon_deg=float(row["longitude_deg"]),
-                elevation_ft=float(row["elevation_ft"]),
+                ident=row.ident,
+                name=row.name,
+                iata=row.iata_code,
+                iso_country=row.iso_country,
+                municipality=row.municipality,
+                lat_deg=row.latitude_deg,
+                lon_deg=row.longitude_deg,
+                elevation_ft=row.elevation_ft,
             )
-            for _, row in df.iterrows()
+            for row in df.itertuples(index=False)
         ]
         self._by_code: dict[str, Airport] = {}
         for airport in self._airports:
@@ -82,6 +109,49 @@ class AirportDB:
         self._runways: pd.DataFrame | None = (
             pd.read_csv(rw_path, dtype=str) if rw_path.exists() else None
         )
+        self._search_df: pd.DataFrame | None = None
+        self._runway_max: dict[str, float] | None = None
+        _DB_CACHE[key] = self
+
+    def _search_frame(self) -> pd.DataFrame:
+        """Flat, search-optimized table (built once, cached)."""
+        if self._search_df is None:
+            rows = [
+                {
+                    "ident": a.ident,
+                    "iata": a.iata,
+                    "name": a.name.upper(),
+                    "municipality": a.municipality.upper(),
+                    "country": a.iso_country,
+                }
+                for a in self._airports
+            ]
+            self._search_df = pd.DataFrame(rows)
+        return self._search_df
+
+    def search(self, query: str, limit: int = 8) -> list[Airport]:
+        """Find airports by ICAO/IATA code or name/city substring.
+
+        Ranking: exact ident/iata match first, then code prefix, then text
+        substring -- so ``urc`` surfaces Urumqi above a Chinese village whose
+        name happens to contain the letters. Case-insensitive; needs at
+        least two characters.
+        """
+        q = query.strip().upper()
+        if len(q) < 2:
+            return []
+        df = self._search_frame()
+        exact = (df["ident"] == q) | (df["iata"] == q)
+        prefix = df["ident"].str.startswith(q) | df["iata"].str.startswith(q)
+        text = df["name"].str.contains(q, regex=False) | df["municipality"].str.contains(
+            q, regex=False
+        )
+        hits = df[exact | prefix | text].copy()
+        hits["_rank"] = 2
+        hits.loc[exact, "_rank"] = 0
+        hits.loc[prefix & ~exact, "_rank"] = 1
+        hits = hits.sort_values(["_rank", "ident"]).head(limit)
+        return [self.get(ident) for ident in hits["ident"]]
 
     def get(self, code: str) -> Airport:
         """Look up an airport by ICAO ident or IATA code (case-insensitive)."""
@@ -105,23 +175,34 @@ class AirportDB:
     def max_runway_m(self, airport: Airport) -> float | None:
         """Longest runway at the airport, in metres; None when unknown.
 
-        Handles both OurAirports schemas: the bundled sample stores
-        ``length_m`` while the full dataset stores ``length_ft`` (converted
-        here at 1 ft = 0.3048 m).
+        Handles both OurAirports schemas (``length_m`` sample / ``length_ft``
+        full dataset, converted at 1 ft = 0.3048 m). The per-airport maximum
+        is precomputed once for the whole file -- with 86k airports a
+        per-airport scan would be quadratic.
         """
-        if self._runways is None:
-            return None
-        subset = self._runways[self._runways["airport_ident"] == airport.ident]
-        if subset.empty:
-            return None
-        if "length_m" in subset.columns:
-            lengths = pd.to_numeric(subset["length_m"], errors="coerce")
-        elif "length_ft" in subset.columns:
-            lengths = pd.to_numeric(subset["length_ft"], errors="coerce") * 0.3048
-        else:
-            return None
-        lengths = lengths.dropna()
-        return float(lengths.max()) if not lengths.empty else None
+        return self._runway_max_map().get(airport.ident)
+
+    def _runway_max_map(self) -> dict[str, float]:
+        if self._runway_max is None:
+            if self._runways is None:
+                self._runway_max = {}
+            else:
+                if "length_m" in self._runways.columns:
+                    lengths = pd.to_numeric(
+                        self._runways["length_m"], errors="coerce"
+                    )
+                else:
+                    lengths = (
+                        pd.to_numeric(self._runways["length_ft"], errors="coerce")
+                        * 0.3048
+                    )
+                self._runway_max = (
+                    self._runways.assign(_len=lengths)
+                    .groupby("airport_ident")["_len"]
+                    .max()
+                    .to_dict()
+                )
+        return self._runway_max
 
     def route(self, origin: str, destination: str) -> Route:
         """Great-circle route between two airports given by code."""
